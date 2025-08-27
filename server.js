@@ -6,8 +6,13 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// index.html ve diğer dosyaları göstermek için
-app.use(express.static(__dirname));
+// public klasörünü göster
+app.use(express.static("public"));
+
+// Ana sayfayı aç
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
 
 let players = {};       // Oyuncular burada tutulacak
 let gameStarted = false;
@@ -66,6 +71,7 @@ function startGame() {
 }
 
 // Sunucuyu başlat
-server.listen(3000, () => {
-  console.log("Server çalışıyor http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log("Server çalışıyor http://localhost:" + PORT);
 });
