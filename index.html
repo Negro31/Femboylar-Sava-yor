@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Online Oyun</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Oyuna giriş menüsü -->
+  <div id="menu">
+    <input id="playerName" placeholder="İsmini yaz...">
+    <button onclick="joinGame()">Oyuna Katıl!</button>
+  </div>
+
+  <!-- Oyun ekranı -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Socket.IO ve client kodları -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
