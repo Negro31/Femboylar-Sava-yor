@@ -3,23 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <title>Online Oyun</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: black; color: white; text-align: center; font-family: Arial; }
+    canvas { background: #111; margin-top: 10px; }
+    #status { margin-top: 10px; font-size: 20px; }
+  </style>
 </head>
 <body>
-  <!-- Oyuna giriş menüsü -->
-  <div id="menu">
-    <input id="playerName" placeholder="İsmini yaz...">
-    <button onclick="joinGame()">Oyuna Katıl!</button>
-    <p id="message"></p>
-  </div>
+  <h1>Femboylar Savaşıyor 👾</h1>
+  <input id="name" placeholder="İsminizi girin">
+  <button onclick="joinGame()">Katıl</button>
+  <div id="status"></div>
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
 
-  <!-- Geri sayım -->
-  <div id="countdown"></div>
-
-  <!-- Oyun ekranı -->
-  <canvas id="gameCanvas"></canvas>
-
-  <!-- Socket.IO ve client kodları -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
 </body>
