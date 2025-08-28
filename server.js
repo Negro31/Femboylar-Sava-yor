@@ -14,7 +14,7 @@ let items = [];
 let gameStarted = false;
 let countdown = 10;
 let countdownInterval;
-let speedMultiplier = 6; // zamanla artacak
+let speedMultiplier = 10; // zamanla artacak
 
 // Oyuncu hareketi
 function movePlayers() {
@@ -43,7 +43,7 @@ function spawnItem() {
   setTimeout(() => {
     items.shift();
     io.emit("updateItems", items);
-  }, 8000);
+  }, 20000);
 }
 
 io.on("connection", (socket) => {
@@ -60,8 +60,8 @@ io.on("connection", (socket) => {
       name: name,
       x: Math.random() * 550,
       y: Math.random() * 350,
-      vx: (Math.random() * 2 - 1) * 16, // daha hızlı
-      vy: (Math.random() * 2 - 1) * 16,
+      vx: (Math.random() * 2 - 1) * 30, // daha hızlı
+      vy: (Math.random() * 2 - 1) * 30,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16),
       hp: 3,
       hasSpike: false,
