@@ -14,7 +14,7 @@ let items = [];
 let gameStarted = false;
 let countdown = 10;
 let countdownInterval;
-let speedMultiplier = 3; // zamanla artacak
+let speedMultiplier = 6; // zamanla artacak
 
 // Oyuncu hareketi
 function movePlayers() {
@@ -60,8 +60,8 @@ io.on("connection", (socket) => {
       name: name,
       x: Math.random() * 550,
       y: Math.random() * 350,
-      vx: (Math.random() * 2 - 1) * 10, // daha hızlı
-      vy: (Math.random() * 2 - 1) * 10,
+      vx: (Math.random() * 2 - 1) * 16, // daha hızlı
+      vy: (Math.random() * 2 - 1) * 16,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16),
       hp: 3,
       hasSpike: false,
