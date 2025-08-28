@@ -16,3 +16,9 @@ body {
   margin: 20px auto;
   border: 2px solid white;
 }
+
+#countdown {
+  font-size: 24px;
+  margin-top: 10px;
+  color: yellow;
+}
