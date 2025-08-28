@@ -7,7 +7,6 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Public klasörünü static dosya olarak ayarlıyoruz
 app.use(express.static(path.join(__dirname, "public")));
 
 let players = {};
@@ -15,13 +14,14 @@ let items = [];
 let gameStarted = false;
 let countdown = 10;
 let countdownInterval;
+let speedMultiplier = 1; // zamanla artacak
 
-// Oyuncu hareketi için
+// Oyuncu hareketi
 function movePlayers() {
   for (let id in players) {
     let p = players[id];
-    p.x += p.vx;
-    p.y += p.vy;
+    p.x += p.vx * speedMultiplier;
+    p.y += p.vy * speedMultiplier;
 
     if (p.x <= 0 || p.x >= 570) p.vx *= -1;
     if (p.y <= 0 || p.y >= 370) p.vy *= -1;
@@ -35,7 +35,7 @@ function spawnItem() {
     id: Date.now(),
     type,
     x: Math.random() * 550 + 20,
-    y: Math.random() * 350 + 20
+    y: Math.random() * 350 + 20,
   });
   io.emit("updateItems", items);
 
@@ -60,45 +60,69 @@ io.on("connection", (socket) => {
       name: name,
       x: Math.random() * 550,
       y: Math.random() * 350,
-      vx: (Math.random() * 2 - 1) * 2,
-      vy: (Math.random() * 2 - 1) * 2,
+      vx: (Math.random() * 2 - 1) * 3, // daha hızlı
+      vy: (Math.random() * 2 - 1) * 3,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16),
       hp: 3,
-      hasSpike: false
+      hasSpike: false,
     };
 
     socket.emit("init", socket.id);
     io.emit("updatePlayers", players);
     callback(true);
 
-    if (!countdownInterval) {
-      countdownInterval = setInterval(() => {
-        io.emit("countdown", countdown);
-        countdown--;
-        if (countdown <= 0) {
-          clearInterval(countdownInterval);
-          startGame();
-        }
-      }, 1000);
-    }
+    checkStartConditions();
   });
 
   socket.on("disconnect", () => {
     delete players[socket.id];
     io.emit("updatePlayers", players);
+
+    if (Object.keys(players).length < 2 && countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+      countdown = 10;
+      io.emit("waiting", "Oyunun başlamasına son 1 kişi!");
+    }
   });
 });
 
-// Oyunu başlatma fonksiyonu
+// Minimum 2 oyuncu olunca sayaç başlasın
+function checkStartConditions() {
+  if (Object.keys(players).length < 2) {
+    io.emit("waiting", "Oyunun başlamasına son 1 kişi!");
+    return;
+  }
+
+  if (!countdownInterval) {
+    countdown = 10;
+    io.emit("waiting", "");
+    countdownInterval = setInterval(() => {
+      io.emit("countdown", countdown);
+      countdown--;
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        startGame();
+      }
+    }, 1000);
+  }
+}
+
+// Oyunu başlat
 function startGame() {
   gameStarted = true;
+  speedMultiplier = 1; // başlangıç hızı
   io.emit("gameStart");
 
-  // Hareket ve savaş döngüsü
-  setInterval(() => {
+  // Oyun döngüsü
+  const gameLoop = setInterval(() => {
     movePlayers();
 
-    // Çarpışma kontrolü
+    // hız yavaş yavaş artsın
+    speedMultiplier += 0.001;
+
+    // Çarpışmalar
     for (let id in players) {
       let p = players[id];
 
@@ -116,7 +140,7 @@ function startGame() {
         }
       }
 
-      // Başka oyuncularla çarpışma
+      // Oyuncular arası çarpışma
       for (let otherId in players) {
         if (id !== otherId) {
           let o = players[otherId];
@@ -137,27 +161,31 @@ function startGame() {
     let alive = Object.values(players);
     if (alive.length === 1) {
       io.emit("winner", alive[0].name);
+      clearInterval(gameLoop);
       resetGame();
     } else if (alive.length === 0) {
+      clearInterval(gameLoop);
       resetGame();
     }
 
     io.emit("updatePlayers", players);
   }, 100);
 
-  // Eşya spawn döngüsü
-  setInterval(() => {
+  // Eşya spawn
+  const itemLoop = setInterval(() => {
     if (gameStarted) spawnItem();
+    else clearInterval(itemLoop);
   }, 5000);
 }
 
-// Oyun reset
+// Reset
 function resetGame() {
   players = {};
   items = [];
   gameStarted = false;
   countdown = 10;
   countdownInterval = null;
+  speedMultiplier = 1;
   io.emit("updatePlayers", players);
   io.emit("updateItems", items);
 }
