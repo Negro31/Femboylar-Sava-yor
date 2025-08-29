@@ -2,16 +2,22 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Online Oyun</title>
+  <title>Femboylar Savaşıyor</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Femboy furko</h1>
-  <input type="text" id="name" placeholder="İsmini yaz...">
-  <button onclick="joinGame()">Oyuna Katıl</button>
-  <p id="status">Oyuncu bekleniyor...</p>
-  <canvas id="game" width="800" height="600"></canvas>
-  <div id="playersList"></div>
+  <div id="login">
+    <input type="text" id="nameInput" placeholder="İsminizi girin">
+    <button id="joinBtn">Oyuna Katıl</button>
+  </div>
+
+  <div id="gameUI" style="display:none;">
+    <div id="status"></div>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <div id="playersList"></div>
+    <div id="winnerOverlay"></div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
 </body>
