@@ -1,85 +1,92 @@
 const socket = io();
-let canvas = document.getElementById("gameCanvas");
-let ctx = canvas.getContext("2d");
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
+let localPlayer = null;
+let players = {};
+let gameStarted = false;
 let countdown = null;
-let winnerName = null;
+let winnerOverlay = document.getElementById("winnerOverlay");
 
-// İsim girme
-document.getElementById("startBtn").onclick = () => {
-  let name = document.getElementById("nameInput").value.trim();
+document.getElementById("joinBtn").addEventListener("click", () => {
+  const name = document.getElementById("nameInput").value.trim();
   if (name) {
-    socket.emit("newPlayer", name);
-    document.getElementById("login").style.display = "none";
+    socket.emit("joinGame", name);
   }
-};
-
-socket.on("state", (state) => {
-  draw(state);
-  updatePlayerList(state.players);
-  if (state.winnerName) winnerName = state.winnerName;
 });
 
-socket.on("countdown", (num) => {
-  countdown = num;
+socket.on("joinError", (msg) => {
+  alert(msg);
+});
+
+socket.on("playersUpdate", (serverPlayers) => {
+  players = serverPlayers;
+});
+
+socket.on("waitingForPlayers", () => {
+  document.getElementById("status").innerText = "Oyunun başlamasına son 1 kişi!";
+});
+
+socket.on("countdown", (time) => {
+  document.getElementById("status").innerText = `Oyun ${time} saniye içinde başlayacak!`;
+});
+
+socket.on("gameStart", () => {
+  document.getElementById("status").innerText = "";
+  gameStarted = true;
+});
+
+socket.on("resetGame", () => {
+  gameStarted = false;
+  winnerOverlay.innerText = "";
+  document.getElementById("status").innerText = "Oyunun başlamasına son 1 kişi!";
 });
 
 socket.on("winner", (name) => {
-  winnerName = name;
+  winnerOverlay.innerText = `KAZANAN: ${name}`;
+  winnerOverlay.style.display = "block";
+  setTimeout(() => {
+    winnerOverlay.style.display = "none";
+  }, 5000);
+});
+
+// Oyuncu girişini göster
+socket.on("connect", () => {
+  document.getElementById("login").style.display = "block";
+  document.getElementById("gameUI").style.display = "block";
+});
+
+// Oyuncu hareketi (ok tuşları)
+document.addEventListener("keydown", (e) => {
+  if (!gameStarted || !players[socket.id]) return;
+  const speed = 10;
+  let player = players[socket.id];
+
+  if (e.key === "ArrowLeft") player.x -= speed;
+  if (e.key === "ArrowRight") player.x += speed;
+  if (e.key === "ArrowUp") player.y -= speed;
+  if (e.key === "ArrowDown") player.y += speed;
+
+  socket.emit("updatePosition", { x: player.x, y: player.y });
 });
 
 // Çizim
-function draw(state) {
+function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Platform
+  ctx.fillStyle = "#333";
+  ctx.fillRect(0, 400, canvas.width, 100);
+
   // Oyuncular
-  for (let id in state.players) {
-    let p = state.players[id];
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "black";
-    ctx.fillText(p.name, p.x - 10, p.y - 20);
-    ctx.fillText("HP:" + p.hp, p.x - 10, p.y + 30);
-  }
-
-  // Eşyalar
-  state.items.forEach((it) => {
-    ctx.fillStyle = it.type === "hp" ? "pink" : "gray";
-    ctx.fillRect(it.x, it.y, it.size, it.size);
-  });
-
-  // Countdown
-  if (countdown !== null && countdown > 0) {
-    ctx.fillStyle = "black";
-    ctx.font = "40px Arial";
-    ctx.fillText(countdown, canvas.width / 2 - 10, canvas.height / 2);
-  }
-
-  // Winner
-  if (winnerName) {
-    ctx.fillStyle = "black";
-    ctx.font = "40px Arial";
-    ctx.fillText(
-      "Kazanan: " + winnerName,
-      canvas.width / 2 - 100,
-      canvas.height / 2
-    );
-  }
-}
-
-// Oyuncu listesi
-function updatePlayerList(players) {
-  let div = document.getElementById("playerList");
-  div.innerHTML = "";
   for (let id in players) {
     let p = players[id];
-    div.innerHTML += `
-      <div style="color:${p.color}">
-        ${p.name} | HP:${p.hp} ${p.hasAtk ? "⚔️" : ""}
-      </div>
-    `;
+    ctx.fillStyle = "blue";
+    ctx.fillRect(p.x, p.y, 40, 40);
+    ctx.fillStyle = "white";
+    ctx.fillText(p.name, p.x, p.y - 5);
   }
+
+  requestAnimationFrame(draw);
 }
+draw();
