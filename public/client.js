@@ -19,7 +19,7 @@ socket.on("init", (id) => {
 
 socket.on("updatePlayers", (data) => {
   players = data;
-  renderRoster(data); // alttaki listeyi güncelle
+  renderRoster(data);
 });
 
 socket.on("updateItems", (data) => {
@@ -42,15 +42,13 @@ socket.on("winner", (name) => {
   document.getElementById("status").innerText = "Kazanan: " + name;
 });
 
-// Oyuncu listesi (canvas altında)
+// Oyuncu listesi
 function renderRoster(playersObj) {
   const list = document.getElementById("rosterList");
   if (!list) return;
 
   list.innerHTML = "";
   const entries = Object.values(playersObj);
-
-  // sırayı sabit tutsun diye isme göre
   entries.sort((a, b) => a.name.localeCompare(b.name));
 
   for (const p of entries) {
@@ -88,11 +86,10 @@ function draw() {
 
   // Eşyalar
   for (let item of items) {
-    ctx.fillStyle = item.type === "attack" ? "red" : "green";
+    ctx.fillStyle = item.type === "attack" ? "red" : item.type === "heal" ? "green" : "blue";
     ctx.fillRect(item.x - 7.5, item.y - 7.5, 15, 15);
   }
 
-  // Oyuncular
   ctx.font = "12px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
@@ -100,11 +97,19 @@ function draw() {
   for (let id in players) {
     const p = players[id];
 
-    // gölge/kenar için
     ctx.beginPath();
     ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
     ctx.fill();
+
+    // Kalkan varsa beyaz çember çiz
+    if (p.hasShield) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
 
     ctx.fillStyle = "white";
     const spikeTxt = p.hasSpike ? "🗡️" : "";
