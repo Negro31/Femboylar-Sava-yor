@@ -1,21 +1,27 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <title>Femboylar Savaşıyor</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Online Oyun</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="login">
-    <input type="text" id="nameInput" placeholder="İsminizi girin">
-    <button id="joinBtn">Oyuna Katıl</button>
+  <h1>Femboylar Savaşıyor 👾</h1>
+
+  <div id="menu">
+    <input id="name" placeholder="İsminizi girin" />
+    <button onclick="joinGame()">Katıl</button>
   </div>
 
-  <div id="gameUI" style="display:none;">
-    <div id="status"></div>
-    <canvas id="gameCanvas" width="800" height="500"></canvas>
-    <div id="playersList"></div>
-    <div id="winnerOverlay"></div>
+  <div id="status"></div>
+
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+  <!-- ALTTAKİ SİYAH ALAN: Oyuncu listesi -->
+  <div id="roster">
+    <div class="roster-title">Oyuncu Listesi</div>
+    <div id="rosterList" class="roster-list"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
