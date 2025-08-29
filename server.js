@@ -16,7 +16,7 @@ const RADIUS = 15;
 const TICK_MS = 50;
 let BASE_SPEED = 6;           // Başlangıç hızı
 let SPEED = BASE_SPEED;       // Dinamik hız
-const SPEED_INCREASE = 0.002; // her tick hız artışı
+const SPEED_INCREASE = 0.02; // her tick hız artışı
 const ITEM_INTERVAL_MS = 2000;
 const ITEM_LIFETIME_MS = 10000;
 
