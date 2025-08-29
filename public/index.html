@@ -1,20 +1,17 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Online Oyun</title>
   <style>
-    body { background: black; color: white; text-align: center; font-family: Arial; }
-    canvas { background: #111; margin-top: 10px; }
-    #status { margin-top: 10px; font-size: 20px; }
+    body { margin: 0; background: #111; color: white; font-family: sans-serif; }
+    canvas { background: #222; display: block; margin: auto; }
+    #playerList { padding: 10px; background: #000; font-size: 14px; }
   </style>
 </head>
 <body>
-  <h1>Femboylar Savaşıyor 👾</h1>
-  <input id="name" placeholder="İsminizi girin">
-  <button onclick="joinGame()">Katıl</button>
-  <div id="status"></div>
-  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="playerList"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
