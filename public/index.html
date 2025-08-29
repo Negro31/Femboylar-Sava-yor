@@ -9,18 +9,54 @@
 <body>
   <h1>Femboylar Savaşıyor 👾</h1>
 
-  <div id="menu">
-    <input id="name" placeholder="İsminizi girin" />
-    <button onclick="joinGame()">Katıl</button>
+  <div id="topBar">
+    <div id="menu">
+      <input id="displayName" placeholder="Oyun içi isim (opsiyonel)" />
+      <button id="joinBtn">Katıl</button>
+    </div>
+
+    <div id="auth">
+      <div id="authForms">
+        <input id="authUser" placeholder="Kullanıcı adı" />
+        <input id="authPass" placeholder="Şifre" type="password" />
+        <button id="btnRegister">Kayıt Ol</button>
+        <button id="btnLogin">Giriş Yap</button>
+      </div>
+      <div id="accountInfo" class="hidden">
+        <span id="accName"></span>
+        <span id="accBalance"></span>
+        <button id="logoutBtn">Çıkış</button>
+      </div>
+    </div>
   </div>
 
   <div id="status"></div>
 
   <canvas id="gameCanvas" width="600" height="400"></canvas>
 
-  <div id="roster">
-    <div class="roster-title">Oyuncu Listesi</div>
-    <div id="rosterList" class="roster-list"></div>
+  <div id="side">
+    <div id="roster">
+      <div class="roster-title">Oyuncu Listesi</div>
+      <div id="rosterList" class="roster-list"></div>
+    </div>
+
+    <div id="leaderboardBox">
+      <div class="roster-title">Liderlik Tablosu (En Çok Kazananlar)</div>
+      <div id="leaderboardList" class="roster-list"></div>
+    </div>
+  </div>
+
+  <!-- Market icon -->
+  <div id="marketBtn" title="Market">🛒</div>
+
+  <!-- Market modal -->
+  <div id="marketModal" class="hidden">
+    <div id="marketContent">
+      <h3>Market</h3>
+      <div id="marketBalance"></div>
+      <div id="marketItems"></div>
+      <button id="closeMarket">Kapat</button>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
