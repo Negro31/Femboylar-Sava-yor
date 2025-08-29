@@ -1,195 +1,117 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static("public"));
 
-let players = {};
-let items = [];
-let gameStarted = false;
-let countdown = 10;
-let countdownInterval;
-let speedMultiplier = 10; // zamanla artacak
+const players = {};
+const items = [];
+const FIXED_SPEED = 6; // tüm oyuncuların hızı
+let lastUpdate = Date.now();
 
-// Oyuncu hareketi
-function movePlayers() {
-  for (let id in players) {
-    let p = players[id];
-    p.x += p.vx * speedMultiplier;
-    p.y += p.vy * speedMultiplier;
-
-    if (p.x <= 0 || p.x >= 570) p.vx *= -1;
-    if (p.y <= 0 || p.y >= 370) p.vy *= -1;
-  }
-}
-
-// Rasgele eşya spawn
 function spawnItem() {
-  const type = Math.random() < 0.5 ? "attack" : "heal";
+  let type = Math.random() < 0.5 ? "hp" : "atk"; // %50 HP %50 ATK
   items.push({
     id: Date.now(),
+    x: Math.random() * 800,
+    y: Math.random() * 600,
     type,
-    x: Math.random() * 550 + 20,
-    y: Math.random() * 350 + 20,
   });
-  io.emit("updateItems", items);
-
-  // 8 saniye sonra kaybolsun
-  setTimeout(() => {
-    items.shift();
-    io.emit("updateItems", items);
-  }, 20000);
 }
+
+// 5 saniyede bir item spawn
+setInterval(spawnItem, 5000);
 
 io.on("connection", (socket) => {
   console.log("Bir oyuncu bağlandı:", socket.id);
 
-  socket.on("join", (name, callback) => {
-    if (gameStarted) {
-      callback(false);
-      return;
-    }
+  socket.on("newPlayer", (name) => {
+    let vx = Math.random() * 2 - 1;
+    let vy = Math.random() * 2 - 1;
+    let len = Math.sqrt(vx * vx + vy * vy);
+    vx = (vx / len) * FIXED_SPEED;
+    vy = (vy / len) * FIXED_SPEED;
 
     players[socket.id] = {
       id: socket.id,
-      name: name,
-      x: Math.random() * 550,
-      y: Math.random() * 350,
-      vx: (Math.random() * 2 - 1) * 30, // daha hızlı
-      vy: (Math.random() * 2 - 1) * 30,
+      name,
+      x: Math.random() * 800,
+      y: Math.random() * 600,
+      vx,
+      vy,
+      hp: 100,
+      hasAtk: false,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16),
-      hp: 3,
-      hasSpike: false,
+      size: 20,
     };
-
-    socket.emit("init", socket.id);
-    io.emit("updatePlayers", players);
-    callback(true);
-
-    checkStartConditions();
   });
 
   socket.on("disconnect", () => {
     delete players[socket.id];
-    io.emit("updatePlayers", players);
-
-    if (Object.keys(players).length < 2 && countdownInterval) {
-      clearInterval(countdownInterval);
-      countdownInterval = null;
-      countdown = 10;
-      io.emit("waiting", "Oyunun başlamasına son 1 kişi!");
-    }
+    console.log("Bir oyuncu ayrıldı:", socket.id);
   });
 });
 
-// Minimum 2 oyuncu olunca sayaç başlasın
-function checkStartConditions() {
-  if (Object.keys(players).length < 2) {
-    io.emit("waiting", "Oyunun başlamasına son 1 kişi!");
-    return;
+function gameLoop() {
+  let now = Date.now();
+  let delta = (now - lastUpdate) / 16; // ~60fps
+  lastUpdate = now;
+
+  // oyuncu hareketi
+  for (let id in players) {
+    let p = players[id];
+    p.x += p.vx * delta;
+    p.y += p.vy * delta;
+
+    // kenarlardan sekme
+    if (p.x < 0 || p.x > 800) p.vx *= -1;
+    if (p.y < 0 || p.y > 600) p.vy *= -1;
   }
 
-  if (!countdownInterval) {
-    countdown = 10;
-    io.emit("waiting", "");
-    countdownInterval = setInterval(() => {
-      io.emit("countdown", countdown);
-      countdown--;
-      if (countdown <= 0) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-        startGame();
+  // çarpışma kontrolü
+  for (let id1 in players) {
+    for (let id2 in players) {
+      if (id1 === id2) continue;
+      let p1 = players[id1];
+      let p2 = players[id2];
+      let dx = p1.x - p2.x;
+      let dy = p1.y - p2.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < p1.size + p2.size) {
+        let overlap = (p1.size + p2.size) - dist;
+        let nx = dx / dist;
+        let ny = dy / dist;
+        p1.x += nx * overlap / 2;
+        p1.y += ny * overlap / 2;
+        p2.x -= nx * overlap / 2;
+        p2.y -= ny * overlap / 2;
       }
-    }, 1000);
+    }
   }
-}
 
-// Oyunu başlat
-function startGame() {
-  gameStarted = true;
-  speedMultiplier = 1; // başlangıç hızı
-  io.emit("gameStart");
-
-  // Oyun döngüsü
-  const gameLoop = setInterval(() => {
-    movePlayers();
-
-    // hız yavaş yavaş artsın
-    speedMultiplier += 0.001;
-
-    // Çarpışmalar
-    for (let id in players) {
-      let p = players[id];
-
-      // Eşya alma
-      for (let i = items.length - 1; i >= 0; i--) {
-        let item = items[i];
-        if (Math.abs(p.x - item.x) < 20 && Math.abs(p.y - item.y) < 20) {
-          if (item.type === "attack") {
-            p.hasSpike = true;
-          } else if (item.type === "heal") {
-            p.hp++;
-          }
-          items.splice(i, 1);
-          io.emit("updateItems", items);
-        }
+  // item toplama
+  for (let id in players) {
+    let p = players[id];
+    items.forEach((item, i) => {
+      let dx = p.x - item.x;
+      let dy = p.y - item.y;
+      if (Math.sqrt(dx * dx + dy * dy) < p.size) {
+        if (item.type === "hp") p.hp = Math.min(100, p.hp + 20);
+        if (item.type === "atk") p.hasAtk = true;
+        items.splice(i, 1);
       }
+    });
+  }
 
-      // Oyuncular arası çarpışma
-      for (let otherId in players) {
-        if (id !== otherId) {
-          let o = players[otherId];
-          if (Math.abs(p.x - o.x) < 30 && Math.abs(p.y - o.y) < 30) {
-            if (p.hasSpike) {
-              o.hp -= 1;
-              p.hasSpike = false;
-              if (o.hp <= 0) {
-                delete players[o.id];
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Kazanan kontrolü
-    let alive = Object.values(players);
-    if (alive.length === 1) {
-      io.emit("winner", alive[0].name);
-      clearInterval(gameLoop);
-      resetGame();
-    } else if (alive.length === 0) {
-      clearInterval(gameLoop);
-      resetGame();
-    }
-
-    io.emit("updatePlayers", players);
-  }, 100);
-
-  // Eşya spawn
-  const itemLoop = setInterval(() => {
-    if (gameStarted) spawnItem();
-    else clearInterval(itemLoop);
-  }, 5000);
+  io.emit("state", { players, items });
 }
 
-// Reset
-function resetGame() {
-  players = {};
-  items = [];
-  gameStarted = false;
-  countdown = 10;
-  countdownInterval = null;
-  speedMultiplier = 1;
-  io.emit("updatePlayers", players);
-  io.emit("updateItems", items);
-}
+setInterval(gameLoop, 1000 / 60);
 
 server.listen(3000, () => {
-  console.log("Server çalışıyor http://localhost:3000");
+  console.log("Sunucu çalışıyor: http://localhost:3000");
 });
