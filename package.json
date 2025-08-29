@@ -1,12 +1,13 @@
 {
   "name": "online-oyun",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Canlı zamanlı online oyun",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
   }
