@@ -1,90 +1,114 @@
 const socket = io();
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-
-let localPlayer = null;
+let playerId = null;
 let players = {};
-let gameStarted = false;
-let countdown = null;
-let winnerOverlay = document.getElementById("winnerOverlay");
+let items = [];
 
-document.getElementById("joinBtn").addEventListener("click", () => {
-  const name = document.getElementById("nameInput").value.trim();
-  if (name) {
-    socket.emit("joinGame", name);
-  }
+function joinGame() {
+  const name = document.getElementById("name").value;
+  if (!name) return alert("İsim girin!");
+  socket.emit("join", name, (success) => {
+    if (!success) alert("Oyun zaten başladı!");
+  });
+}
+
+socket.on("init", (id) => {
+  playerId = id;
 });
 
-socket.on("joinError", (msg) => {
-  alert(msg);
+socket.on("updatePlayers", (data) => {
+  players = data;
+  renderRoster(data); // alttaki listeyi güncelle
 });
 
-socket.on("playersUpdate", (serverPlayers) => {
-  players = serverPlayers;
+socket.on("updateItems", (data) => {
+  items = data;
 });
 
-socket.on("waitingForPlayers", () => {
-  document.getElementById("status").innerText = "Oyunun başlamasına son 1 kişi!";
+socket.on("waiting", (msg) => {
+  document.getElementById("status").innerText = msg;
 });
 
 socket.on("countdown", (time) => {
-  document.getElementById("status").innerText = `Oyun ${time} saniye içinde başlayacak!`;
+  document.getElementById("status").innerText = "Oyun " + time + " saniye içinde başlıyor!";
 });
 
 socket.on("gameStart", () => {
-  document.getElementById("status").innerText = "";
-  gameStarted = true;
-});
-
-socket.on("resetGame", () => {
-  gameStarted = false;
-  winnerOverlay.innerText = "";
-  document.getElementById("status").innerText = "Oyunun başlamasına son 1 kişi!";
+  document.getElementById("status").innerText = "Oyun başladı!";
 });
 
 socket.on("winner", (name) => {
-  winnerOverlay.innerText = `KAZANAN: ${name}`;
-  winnerOverlay.style.display = "block";
-  setTimeout(() => {
-    winnerOverlay.style.display = "none";
-  }, 5000);
+  document.getElementById("status").innerText = "Kazanan: " + name;
 });
 
-// Oyuncu girişini göster
-socket.on("connect", () => {
-  document.getElementById("login").style.display = "block";
-  document.getElementById("gameUI").style.display = "block";
-});
+// Oyuncu listesi (canvas altında)
+function renderRoster(playersObj) {
+  const list = document.getElementById("rosterList");
+  if (!list) return;
 
-// Oyuncu hareketi (ok tuşları)
-document.addEventListener("keydown", (e) => {
-  if (!gameStarted || !players[socket.id]) return;
-  const speed = 10;
-  let player = players[socket.id];
+  list.innerHTML = "";
+  const entries = Object.values(playersObj);
 
-  if (e.key === "ArrowLeft") player.x -= speed;
-  if (e.key === "ArrowRight") player.x += speed;
-  if (e.key === "ArrowUp") player.y -= speed;
-  if (e.key === "ArrowDown") player.y += speed;
+  // sırayı sabit tutsun diye isme göre
+  entries.sort((a, b) => a.name.localeCompare(b.name));
 
-  socket.emit("updatePosition", { x: player.x, y: player.y });
-});
+  for (const p of entries) {
+    const li = document.createElement("div");
+    li.className = "roster-item";
 
-// Çizim
+    const dot = document.createElement("span");
+    dot.className = "color-dot";
+    dot.style.background = p.color;
+
+    const name = document.createElement("span");
+    name.className = "roster-name";
+    name.textContent = p.name;
+
+    const hp = document.createElement("span");
+    hp.className = "roster-hp";
+    hp.textContent = `HP: ${p.hp}`;
+
+    const spike = document.createElement("span");
+    spike.className = "roster-spike";
+    spike.textContent = p.hasSpike ? "🗡️" : "—";
+    spike.title = p.hasSpike ? "Saldırı eşyası var" : "Saldırı eşyası yok";
+
+    li.appendChild(dot);
+    li.appendChild(name);
+    li.appendChild(hp);
+    li.appendChild(spike);
+    list.appendChild(li);
+  }
+}
+
+// Oyun ekranı çizim
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Platform
-  ctx.fillStyle = "#333";
-  ctx.fillRect(0, 400, canvas.width, 100);
+  // Eşyalar
+  for (let item of items) {
+    ctx.fillStyle = item.type === "attack" ? "red" : "green";
+    ctx.fillRect(item.x - 7.5, item.y - 7.5, 15, 15);
+  }
 
   // Oyuncular
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+
   for (let id in players) {
-    let p = players[id];
-    ctx.fillStyle = "blue";
-    ctx.fillRect(p.x, p.y, 40, 40);
+    const p = players[id];
+
+    // gölge/kenar için
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+
     ctx.fillStyle = "white";
-    ctx.fillText(p.name, p.x, p.y - 5);
+    const spikeTxt = p.hasSpike ? "🗡️" : "";
+    ctx.fillText(`${p.name} (HP:${p.hp}) ${spikeTxt}`, p.x, p.y - 20);
   }
 
   requestAnimationFrame(draw);
