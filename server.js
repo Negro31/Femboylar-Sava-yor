@@ -13,10 +13,12 @@ app.use(express.static(path.join(__dirname, "public")));
 const W = 600;
 const H = 400;
 const RADIUS = 15;
-const TICK_MS = 50;          // daha pürüzsüz hareket
-const SPEED = 8;             // tüm oyuncular için SABİT ve hızlı hız (px/tick)
-const ITEM_INTERVAL_MS = 2000; // 2 sn'de bir eşya
-const ITEM_LIFETIME_MS = 10000; // 10 sn sonra kaybolsun
+const TICK_MS = 50;
+let BASE_SPEED = 6;           // Başlangıç hızı
+let SPEED = BASE_SPEED;       // Dinamik hız
+const SPEED_INCREASE = 0.002; // her tick hız artışı
+const ITEM_INTERVAL_MS = 2000;
+const ITEM_LIFETIME_MS = 10000;
 
 let players = {};
 let items = [];
@@ -42,23 +44,11 @@ function movePlayers() {
     p.x += p.vx;
     p.y += p.vy;
 
-    // Duvarlara çarp ve geri seken
-    if (p.x < RADIUS) {
-      p.x = RADIUS;
-      p.vx *= -1;
-    } else if (p.x > W - RADIUS) {
-      p.x = W - RADIUS;
-      p.vx *= -1;
-    }
-    if (p.y < RADIUS) {
-      p.y = RADIUS;
-      p.vy *= -1;
-    } else if (p.y > H - RADIUS) {
-      p.y = H - RADIUS;
-      p.vy *= -1;
-    }
+    if (p.x < RADIUS) { p.x = RADIUS; p.vx *= -1; }
+    else if (p.x > W - RADIUS) { p.x = W - RADIUS; p.vx *= -1; }
+    if (p.y < RADIUS) { p.y = RADIUS; p.vy *= -1; }
+    else if (p.y > H - RADIUS) { p.y = H - RADIUS; p.vy *= -1; }
 
-    // Hızı sabit tut
     const n = normalize(p.vx, p.vy, SPEED);
     p.vx = n.vx;
     p.vy = n.vy;
@@ -67,7 +57,12 @@ function movePlayers() {
 
 // Rasgele eşya spawn
 function spawnItem() {
-  const type = Math.random() < 0.5 ? "attack" : "heal";
+  const rand = Math.random();
+  let type;
+  if (rand < 0.4) type = "attack"; // %40
+  else if (rand < 0.6) type = "heal"; // %20
+  else type = "shield"; // %40
+
   const newItem = {
     id: Date.now() + Math.random(),
     type,
@@ -77,14 +72,13 @@ function spawnItem() {
   items.push(newItem);
   io.emit("updateItems", items);
 
-  // belirli süre sonra kaldır
   setTimeout(() => {
     items = items.filter((it) => it.id !== newItem.id);
     io.emit("updateItems", items);
   }, ITEM_LIFETIME_MS);
 }
 
-// Oyuncu-oyuncu çarpışmaları (sekme + hasar)
+// Oyuncu-oyuncu çarpışmaları
 function handlePlayerCollisions() {
   const ids = Object.keys(players);
   for (let i = 0; i < ids.length; i++) {
@@ -98,7 +92,6 @@ function handlePlayerCollisions() {
       const dist = Math.hypot(dx, dy);
 
       if (dist < 2 * RADIUS) {
-        // Biraz ayır (overlap çöz)
         const overlap = 2 * RADIUS - dist || 0.01;
         const nx = dx / (dist || 1);
         const ny = dy / (dist || 1);
@@ -107,25 +100,30 @@ function handlePlayerCollisions() {
         b.x += (nx * overlap) / 2;
         b.y += (ny * overlap) / 2;
 
-        // Basit sekme: hızları değiş tokuş et
         const avx = a.vx, avy = a.vy;
         a.vx = b.vx; a.vy = b.vy;
         b.vx = avx;  b.vy = avy;
 
-        // Hızı sabit tut
         const an = normalize(a.vx, a.vy, SPEED);
         const bn = normalize(b.vx, b.vy, SPEED);
         a.vx = an.vx; a.vy = an.vy;
         b.vx = bn.vx; b.vy = bn.vy;
 
-        // Hasar (spike olan, rakibin HP'sini 1 düşürür ve spike kaybolur)
-        if (a.hasSpike) { b.hp -= 1; a.hasSpike = false; }
-        if (b.hasSpike) { a.hp -= 1; b.hasSpike = false; }
+        // Hasar
+        if (a.hasSpike) {
+          if (b.hasShield) { b.hasShield = false; }
+          else { b.hp -= 1; }
+          a.hasSpike = false;
+        }
+        if (b.hasSpike) {
+          if (a.hasShield) { a.hasShield = false; }
+          else { a.hp -= 1; }
+          b.hasSpike = false;
+        }
       }
     }
   }
 
-  // Ölüm temizliği (çarpışma turu bittikten sonra)
   for (let id of Object.keys(players)) {
     if (players[id].hp <= 0) delete players[id];
   }
@@ -140,7 +138,6 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // rasgele yön fakat SABİT hız
     const angle = Math.random() * Math.PI * 2;
     const vx = Math.cos(angle) * SPEED;
     const vy = Math.sin(angle) * SPEED;
@@ -155,10 +152,11 @@ io.on("connection", (socket) => {
       color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6,"0"),
       hp: 3,
       hasSpike: false,
+      hasShield: false,
     };
 
     socket.emit("init", socket.id);
-    io.emit("updatePlayers", players);
+    io.emit("updatePlayers", players); // herkes görebilsin
     callback(true);
 
     checkStartConditions();
@@ -202,34 +200,31 @@ function checkStartConditions() {
 // Oyunu başlat
 function startGame() {
   gameStarted = true;
+  SPEED = BASE_SPEED;
   io.emit("gameStart");
 
-  // Oyun döngüsü
   const gameLoop = setInterval(() => {
+    SPEED += SPEED_INCREASE; // hız artışı
+
     movePlayers();
 
-    // Eşya alma
     for (let id in players) {
       const p = players[id];
-
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
         if (Math.abs(p.x - item.x) < RADIUS + 5 && Math.abs(p.y - item.y) < RADIUS + 5) {
-          if (item.type === "attack") {
-            p.hasSpike = true;
-          } else if (item.type === "heal") {
-            p.hp++;
-          }
+          if (item.type === "attack") p.hasSpike = true;
+          else if (item.type === "heal") p.hp++;
+          else if (item.type === "shield") p.hasShield = true;
+
           items.splice(i, 1);
           io.emit("updateItems", items);
         }
       }
     }
 
-    // Oyuncular arası çarpışma + hasar
     handlePlayerCollisions();
 
-    // Kazanan kontrolü
     const alive = Object.values(players);
     if (alive.length === 1) {
       io.emit("winner", alive[0].name);
@@ -243,7 +238,6 @@ function startGame() {
     io.emit("updatePlayers", players);
   }, TICK_MS);
 
-  // Eşya spawn
   const itemLoop = setInterval(() => {
     if (gameStarted) spawnItem();
     else clearInterval(itemLoop);
@@ -255,6 +249,7 @@ function resetGame() {
   players = {};
   items = [];
   gameStarted = false;
+  SPEED = BASE_SPEED;
   countdown = 10;
   countdownInterval = null;
   io.emit("updatePlayers", players);
