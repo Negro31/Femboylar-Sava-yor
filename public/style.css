@@ -1,34 +1,116 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  text-align: center;
   background: #111;
   color: white;
+  text-align: center;
 }
 
-#login {
-  margin-top: 20px;
+h1 {
+  margin: 12px 0 8px;
 }
 
-#gameCanvas {
-  border: 2px solid white;
-  margin-top: 20px;
-  background: #222;
+#menu {
+  margin-top: 8px;
+}
+
+#menu input {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #000;
+  color: #fff;
+}
+
+#menu button {
+  padding: 6px 10px;
+  margin-left: 6px;
+  border: 1px solid #888;
+  background: #1e1e1e;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 #status {
-  margin: 10px;
-  font-size: 20px;
-  color: yellow;
+  margin-top: 8px;
+  font-size: 18px;
+  min-height: 24px;
+  color: #ddd;
 }
 
-#winnerOverlay {
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 40px;
-  color: red;
+#gameCanvas {
+  background: #222;
+  display: block;
+  margin: 12px auto 0;
+  border: 2px solid white;
+}
+
+/* ALTTAKİ SİYAH ALAN */
+#roster {
+  background: #000;
+  margin: 14px auto 0;
+  max-width: 640px;
+  border-top: 1px solid #333;
+  padding: 10px 12px 20px;
+}
+
+.roster-title {
+  text-align: left;
   font-weight: bold;
-  display: none;
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+
+.roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex: 0 0 14px;
+  border: 1px solid #fff2;
+}
+
+.roster-name {
+  margin-left: 8px;
+  flex: 1;
+  text-align: left;
+}
+
+.roster-hp {
+  margin-right: 8px;
+  min-width: 48px;
+}
+
+.roster-spike {
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Mobil uyum */
+@media (max-width: 700px) {
+  #gameCanvas {
+    width: 95vw;
+    height: auto; /* oran korumak istersen sabit bırakabilirsin */
+  }
+  #roster {
+    margin-left: 2.5vw;
+    margin-right: 2.5vw;
+  }
 }
