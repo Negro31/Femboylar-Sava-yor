@@ -1,3 +1,4 @@
+/* style.css */
 body {
   margin: 0;
   font-family: Arial, sans-serif;
@@ -10,8 +11,18 @@ h1 {
   margin: 12px 0 8px;
 }
 
+#topBar {
+  display:flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 12px;
+}
+
 #menu {
-  margin-top: 8px;
+  display:flex;
+  gap:8px;
+  align-items:center;
 }
 
 #menu input {
@@ -24,13 +35,44 @@ h1 {
 
 #menu button {
   padding: 6px 10px;
-  margin-left: 6px;
   border: 1px solid #888;
   background: #1e1e1e;
   color: #fff;
   border-radius: 6px;
   cursor: pointer;
 }
+
+#auth {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+#authForms input {
+  padding: 6px;
+  margin-right: 6px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #000;
+  color: #fff;
+}
+
+#authForms button {
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-right: 4px;
+  border: 1px solid #666;
+  background: #222;
+  cursor:pointer;
+}
+
+#accountInfo {
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+.hidden { display:none; }
 
 #status {
   margin-top: 8px;
@@ -44,14 +86,25 @@ h1 {
   display: block;
   margin: 12px auto 0;
   border: 2px solid white;
+  max-width: 95vw;
 }
 
-#roster {
+/* Sağda yan panel */
+#side {
+  position: absolute;
+  top: 120px;
+  right: 12px;
+  width: 260px;
+  max-width: 40vw;
+  text-align:left;
+}
+
+#roster, #leaderboardBox {
   background: #000;
-  margin: 14px auto 0;
-  max-width: 640px;
+  margin: 8px 0;
   border-top: 1px solid #333;
-  padding: 10px 12px 20px;
+  padding: 10px;
+  border-radius: 8px;
 }
 
 .roster-title {
@@ -65,6 +118,8 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 240px;
+  overflow: auto;
 }
 
 .roster-item {
@@ -86,29 +141,59 @@ h1 {
   border: 1px solid #fff2;
 }
 
-.roster-name {
-  margin-left: 8px;
-  flex: 1;
-  text-align: left;
+.roster-name { margin-left: 8px; flex: 1; text-align: left; }
+.roster-hp { margin-right: 8px; min-width: 48px; }
+.roster-spike { min-width: 18px; text-align: center; }
+
+/* Market icon */
+#marketBtn {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  font-size: 28px;
+  background: rgba(255,255,255,0.06);
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid #333;
 }
 
-.roster-hp {
-  margin-right: 8px;
-  min-width: 48px;
+/* Market modal */
+#marketModal {
+  position: fixed;
+  inset: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,0.6);
 }
 
-.roster-spike {
-  min-width: 18px;
-  text-align: center;
+#marketContent {
+  width: 320px;
+  max-width: 90%;
+  background: #0f0f0f;
+  border: 1px solid #333;
+  padding: 12px;
+  border-radius: 8px;
+  text-align:left;
 }
 
+.market-item {
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  padding:8px;
+  border:1px solid #222;
+  margin-bottom:8px;
+  border-radius:6px;
+}
+
+/* Hesap bakiye küçük gösterge */
+#accName { font-weight:bold; margin-right:8px; }
+#accBalance { margin-left:8px; background:#161616; padding:4px 8px; border-radius:8px; border:1px solid #333; }
+
+/* Mobil uyum */
 @media (max-width: 700px) {
-  #gameCanvas {
-    width: 95vw;
-    height: auto;
-  }
-  #roster {
-    margin-left: 2.5vw;
-    margin-right: 2.5vw;
-  }
+  #gameCanvas { width: 95vw; height: auto; }
+  #side { position: static; width: auto; margin: 8px; }
 }
