@@ -41,6 +41,21 @@ const marketItemsDiv = document.getElementById("marketItems");
 const marketBalanceDiv = document.getElementById("marketBalance");
 const closeMarketBtn = document.getElementById("closeMarket");
 
+// ------------------ Session resume on connect ------------------
+socket.on("connect", () => {
+  // Eğer localStorage'da token varsa, sunucuya gönder resume isteği
+  const token = localStorage.getItem("sessionToken");
+  if (token) {
+    socket.emit("resumeSession", token, (res) => {
+      if (!res || !res.ok) {
+        // Geçersiz token ise temizle
+        localStorage.removeItem("sessionToken");
+      }
+      // Eğer resume başarılıysa sunucu 'accountUpdate' gönderecek
+    });
+  }
+});
+
 // Event listeners
 joinBtn.onclick = () => {
   const name = (displayNameInput.value || "").trim();
@@ -69,7 +84,10 @@ btnLogin.onclick = () => {
   if (!u || !p) return alert("Kullanıcı adı ve şifre girin.");
   socket.emit("login", { username: u, password: p }, (res) => {
     if (res.ok) {
-      // Başarılı, sunucu 'accountUpdate' event'iyle detay gönderecek
+      // login başarılıysa gerçek hesap bilgileri server'dan 'accountUpdate' ile gelecek
+      // fakat UI'ı hemen kullanıcının deneyimini bozmayacak şekilde açalım
+      // (server'dan gelecek accountUpdate içinde sessionToken olacak)
+      // gizlilik: gerçekte sadece server'dan gelecek accountUpdate güvenlidir
       authForms.classList.add("hidden");
       accountInfo.classList.remove("hidden");
     } else {
@@ -79,8 +97,14 @@ btnLogin.onclick = () => {
 };
 
 logoutBtn.onclick = () => {
-  // Basit client-side logout (sunucuya bilgi yok). Yeniden yükle
-  location.reload();
+  socket.emit("logout", (res) => {
+    localStorage.removeItem("sessionToken");
+    account = null;
+    authForms.classList.remove("hidden");
+    accountInfo.classList.add("hidden");
+    // sayfayı yenile
+    location.reload();
+  });
 };
 
 // Market
@@ -99,12 +123,12 @@ function closeMarket() {
   marketModal.classList.add("hidden");
 }
 
-// 🔹 Arka plana tıklayınca kapat
+// Arka plana tıklayınca kapat
 marketModal.addEventListener("click", (e) => {
   if (e.target === marketModal) closeMarket();
 });
 
-// 🔹 ESC ile kapat
+// ESC ile kapat
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeMarket();
 });
@@ -166,7 +190,7 @@ socket.on("winner", (name) => {
   statusDiv.innerText = "Kazanan: " + name;
 });
 
-// Hesap bilgileri
+// Hesap bilgileri (sessionToken sakla / localStorage)
 socket.on("accountUpdate", (acc) => {
   account = {
     username: acc.username,
@@ -175,8 +199,21 @@ socket.on("accountUpdate", (acc) => {
     kills: acc.kills || 0,
     inventory: acc.inventory || {}
   };
+  // Eğer sunucu token gönderdi ise localStorage'a kaydet (sayfa yenilense resume edilecek)
+  if (acc.sessionToken) {
+    localStorage.setItem("sessionToken", acc.sessionToken);
+  }
+  // UI güncelle
   renderAccount();
   renderMarket();
+
+  // account varsa authForms'ı gizle, accountInfo'yu göster, side ve market butonunu aç
+  if (account && account.username) {
+    authForms.classList.add("hidden");
+    accountInfo.classList.remove("hidden");
+    document.getElementById("marketBtn").classList.remove("hidden");
+    document.getElementById("side").classList.remove("hidden");
+  }
 });
 
 // Liderlik tablosu
