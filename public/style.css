@@ -74,6 +74,7 @@ h1 {
 
 .hidden { display:none; }
 
+/* 🔹 Market modal - temel (NOT: .hidden override eklendi daha sonra) */
 #status {
   margin-top: 8px;
   font-size: 18px;
@@ -91,12 +92,14 @@ h1 {
 
 /* Sağda yan panel */
 #side {
-  position: absolute;
-  top: 120px;
+  /* 🔹 absolute -> fixed yapıldı, top biraz artırıldı, z-index eklendi */
+  position: fixed;
+  top: 140px;
   right: 12px;
   width: 260px;
   max-width: 40vw;
   text-align:left;
+  z-index: 10;  /* modalın altında kalmayacak şekilde ayarlandı */
 }
 
 #roster, #leaderboardBox {
@@ -162,11 +165,15 @@ h1 {
 #marketModal {
   position: fixed;
   inset: 0;
-  display:flex;
+  display:flex; /* 🔹 burası display:flex olduğu için .hidden daha spesifik hale getirildi */
   align-items:center;
   justify-content:center;
   background: rgba(0,0,0,0.6);
+  z-index: 9999; /* 🔹 side'ın üstünde görünmesi için yüksek z-index */
 }
+
+/* 🔹 Özgüllük: id + sınıf kombinasyonu ile gizleme (önceki sorun bu satır ile çözüldü) */
+#marketModal.hidden { display: none; }
 
 #marketContent {
   width: 320px;
