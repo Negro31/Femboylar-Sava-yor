@@ -13,6 +13,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, "public")));
+app.use(express.json());
 
 // ---- Oyun ayarları ----
 const W = 600;
@@ -70,10 +71,16 @@ let onlineUsers = {};
 function loadUsers() {
   try {
     if (!fs.existsSync(USERS_FILE)) {
-      fs.writeFileSync(USERS_FILE, JSON.stringify({}), "utf8");
+      fs.writeFileSync(USERS_FILE, JSON.stringify({}, null, 2), "utf8");
     }
     const raw = fs.readFileSync(USERS_FILE, "utf8");
-    return JSON.parse(raw || "{}");
+    const parsed = JSON.parse(raw || "{}");
+
+    // Eğer dosya eski formatta { "players": {...} } ise normalize et:
+    if (parsed && typeof parsed === "object" && Object.keys(parsed).length === 1 && parsed.players && typeof parsed.players === "object") {
+      return parsed.players;
+    }
+    return parsed;
   } catch (e) {
     console.error("users.json yüklenirken hata:", e);
     return {};
@@ -87,6 +94,11 @@ function saveUsers(data) {
   }
 }
 let usersData = loadUsers();
+
+// Basit token üreteci
+function generateToken() {
+  return require("crypto").randomBytes(24).toString("hex");
+}
 
 // ----------- Yardımcı fonksiyonlar -----------
 function normalize(vx, vy, target = SPEED) {
@@ -288,23 +300,70 @@ io.on("connection", (socket) => {
     const match = bcrypt.compareSync(password, u.passwordHash || "");
     if (!match) return cb && cb({ ok: false, msg: "Şifre hatalı." });
 
+    // 🔹 Oturum tokeni oluştur ve kaydet
+    const token = generateToken();
+    usersData[username].sessionToken = token;
+    saveUsers(usersData);
+
     // Başarılı login
     socket.data.username = username;
     onlineUsers[username] = socket.id;
     emitOnlineUsers();
 
-    // Gönder hesap bilgisi
+    // Gönder hesap bilgisi (sessionToken dahil)
     socket.emit("accountUpdate", {
       username,
       balance: u.balance || 0,
       wins: u.wins || 0,
       kills: u.kills || 0,
-      inventory: u.inventory || {}
+      inventory: u.inventory || {},
+      sessionToken: token // 🔹
     });
 
     // Gönder leaderboard
     emitLeaderboard();
 
+    cb && cb({ ok: true });
+  });
+
+  // 🔹 Resume session: client yenilendikten sonra token gönderirse session'ı geri kur
+  socket.on("resumeSession", (token, cb) => {
+    if (!token) return cb && cb({ ok: false });
+    const username = Object.keys(usersData).find(u => usersData[u] && usersData[u].sessionToken === token);
+    if (!username) {
+      // token geçersiz
+      return cb && cb({ ok: false });
+    }
+    // session geri yüklendi
+    socket.data.username = username;
+    onlineUsers[username] = socket.id;
+    emitOnlineUsers();
+
+    const u = usersData[username];
+    socket.emit("accountUpdate", {
+      username,
+      balance: u.balance || 0,
+      wins: u.wins || 0,
+      kills: u.kills || 0,
+      inventory: u.inventory || {},
+      sessionToken: u.sessionToken
+    });
+    emitLeaderboard();
+    cb && cb({ ok: true });
+  });
+
+  // 🔹 Logout: client manuel çıkış isterse token silinsin ve onlineUsers güncellensin
+  socket.on("logout", (cb) => {
+    const username = socket.data.username;
+    if (username && usersData[username]) {
+      delete usersData[username].sessionToken;
+      saveUsers(usersData);
+    }
+    if (username && onlineUsers[username]) {
+      delete onlineUsers[username];
+      emitOnlineUsers();
+    }
+    socket.data.username = null;
     cb && cb({ ok: true });
   });
 
@@ -427,7 +486,7 @@ io.on("connection", (socket) => {
       // Tüm oyunculara -2 can
       const killed = [];
       for (const sid of Object.keys(players)) {
-        if (sid === socket.id) continue; // kullanıcının kendisi de etkilenebilir miy? Karar: hepsini etkiliyor; fakat burada "bütün oyuncular" dediğinden kendisini de düşürmesin (opsiyonel). Ben KENDİSİNİ ETKİLEMEMESİ için skip ettim.
+        if (sid === socket.id) continue; // kullanıcının kendisi etkilenmesin
         const target = players[sid];
         if (!target) continue;
         target.hp -= 2;
