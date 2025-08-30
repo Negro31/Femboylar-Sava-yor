@@ -159,6 +159,7 @@ h1 {
   border-radius: 10px;
   cursor: pointer;
   border: 1px solid #333;
+  z-index: 50; /* 🔹 canvas üstünde kalsın */
 }
 
 /* Market modal */
