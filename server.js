@@ -22,7 +22,7 @@ const RADIUS = 15;
 const TICK_MS = 50;
 let BASE_SPEED = 6;           // Başlangıç hızı
 let SPEED = BASE_SPEED;       // Dinamik global hız (tüm oyuncuların baz hızı)
-const SPEED_INCREASE = 0.002; // her tick global hız artışı
+const SPEED_INCREASE = 0.008; // her tick global hız artışı
 const ITEM_INTERVAL_MS = 2000;
 const ITEM_LIFETIME_MS = 10000;
 
