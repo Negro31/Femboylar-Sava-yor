@@ -12,7 +12,7 @@ h1 {
 }
 
 #topBar {
-  display:flex;
+  display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
@@ -20,66 +20,98 @@ h1 {
 }
 
 #menu {
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
-#menu input {
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #000;
-  color: #fff;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 #menu button {
-  padding: 6px 10px;
+  padding: 8px 16px;
   border: 1px solid #888;
   background: #1e1e1e;
   color: #fff;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+#menu button:hover {
+  background: #333;
+  border-color: #aaa;
 }
 
 #auth {
-  display:flex;
-  align-items:center;
-  gap:8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#authForms {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 #authForms input {
-  padding: 6px;
-  margin-right: 6px;
+  padding: 8px;
   border-radius: 6px;
   border: 1px solid #444;
   background: #000;
   color: #fff;
+  font-size: 14px;
+}
+
+#authForms input:focus {
+  border-color: #666;
+  outline: none;
 }
 
 #authForms button {
-  padding: 6px 8px;
+  padding: 8px 12px;
   border-radius: 6px;
-  margin-right: 4px;
   border: 1px solid #666;
   background: #222;
-  cursor:pointer;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#authForms button:hover {
+  background: #444;
+  border-color: #888;
 }
 
 #accountInfo {
-  display:flex;
-  gap:10px;
-  align-items:center;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
-.hidden { display:none; }
+#logoutBtn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #666;
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
 
-/* 🔹 Market modal - temel (NOT: .hidden override eklendi daha sonra) */
+#logoutBtn:hover {
+  background: #666;
+}
+
+.hidden { 
+  display: none !important; 
+}
+
 #status {
   margin-top: 8px;
   font-size: 18px;
   min-height: 24px;
   color: #ddd;
+  font-weight: bold;
 }
 
 #gameCanvas {
@@ -92,20 +124,19 @@ h1 {
 
 /* Sağda yan panel */
 #side {
-  /* 🔹 absolute -> fixed yapıldı, top biraz artırıldı, z-index eklendi */
   position: fixed;
   top: 140px;
   right: 12px;
   width: 260px;
   max-width: 40vw;
-  text-align:left;
-  z-index: 10;  /* modalın altında kalmayacak şekilde ayarlandı */
+  text-align: left;
+  z-index: 10;
 }
 
 #roster, #leaderboardBox {
   background: #000;
   margin: 8px 0;
-  border-top: 1px solid #333;
+  border: 1px solid #333;
   padding: 10px;
   border-radius: 8px;
 }
@@ -115,6 +146,7 @@ h1 {
   font-weight: bold;
   opacity: 0.9;
   margin-bottom: 8px;
+  color: #ccc;
 }
 
 .roster-list {
@@ -133,6 +165,11 @@ h1 {
   border: 1px solid #333;
   border-radius: 8px;
   padding: 6px 10px;
+  transition: background-color 0.2s;
+}
+
+.roster-item:hover {
+  background: #1a1a1a;
 }
 
 .color-dot {
@@ -144,9 +181,25 @@ h1 {
   border: 1px solid #fff2;
 }
 
-.roster-name { margin-left: 8px; flex: 1; text-align: left; }
-.roster-hp { margin-right: 8px; min-width: 48px; }
-.roster-spike { min-width: 18px; text-align: center; }
+.roster-name { 
+  margin-left: 8px; 
+  flex: 1; 
+  text-align: left; 
+  font-size: 14px;
+}
+
+.roster-hp { 
+  margin-right: 8px; 
+  min-width: 48px; 
+  font-size: 12px;
+  color: #aaa;
+}
+
+.roster-spike { 
+  min-width: 18px; 
+  text-align: center; 
+  font-size: 14px;
+}
 
 /* Market icon */
 #marketBtn {
@@ -154,54 +207,160 @@ h1 {
   bottom: 18px;
   right: 18px;
   font-size: 28px;
-  background: rgba(255,255,255,0.06);
-  padding: 8px;
-  border-radius: 10px;
+  background: rgba(255,255,255,0.1);
+  padding: 12px;
+  border-radius: 12px;
   cursor: pointer;
-  border: 1px solid #333;
-  z-index: 50; /* 🔹 canvas üstünde kalsın */
+  border: 1px solid #444;
+  z-index: 50;
+  transition: all 0.3s ease;
+}
+
+#marketBtn:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: #666;
+  transform: scale(1.05);
 }
 
 /* Market modal */
 #marketModal {
   position: fixed;
   inset: 0;
-  display:flex; /* 🔹 burası display:flex olduğu için .hidden daha spesifik hale getirildi */
-  align-items:center;
-  justify-content:center;
-  background: rgba(0,0,0,0.6);
-  z-index: 9999; /* 🔹 side'ın üstünde görünmesi için yüksek z-index */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.8);
+  z-index: 9999;
 }
 
-/* 🔹 Özgüllük: id + sınıf kombinasyonu ile gizleme (önceki sorun bu satır ile çözüldü) */
-#marketModal.hidden { display: none; }
+#marketModal.hidden { 
+  display: none !important; 
+}
 
 #marketContent {
-  width: 320px;
+  width: 400px;
   max-width: 90%;
   background: #0f0f0f;
-  border: 1px solid #333;
-  padding: 12px;
-  border-radius: 8px;
-  text-align:left;
+  border: 2px solid #333;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: left;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+#marketContent h3 {
+  margin: 0 0 15px 0;
+  text-align: center;
+  color: #fff;
+  font-size: 20px;
+}
+
+#marketBalance {
+  text-align: center;
+  margin-bottom: 15px;
+  font-weight: bold;
+  color: #4CAF50;
+  font-size: 16px;
 }
 
 .market-item {
-  display:flex;
+  display: flex;
   justify-content: space-between;
-  align-items:center;
-  padding:8px;
-  border:1px solid #222;
-  margin-bottom:8px;
-  border-radius:6px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #444;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: #1a1a1a;
 }
 
-/* Hesap bakiye küçük gösterge */
-#accName { font-weight:bold; margin-right:8px; }
-#accBalance { margin-left:8px; background:#161616; padding:4px 8px; border-radius:8px; border:1px solid #333; }
+.market-item:hover {
+  background: #252525;
+  border-color: #666;
+}
+
+.market-item button {
+  margin-left: 5px;
+  padding: 5px 8px;
+  border: 1px solid #666;
+  background: #333;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.market-item button:hover {
+  background: #555;
+  border-color: #888;
+}
+
+#closeMarket {
+  width: 100%;
+  padding: 10px;
+  margin-top: 15px;
+  border: 1px solid #666;
+  background: #444;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#closeMarket:hover {
+  background: #666;
+}
+
+/* Hesap bakiye gösterge */
+#accName { 
+  font-weight: bold; 
+  margin-right: 10px; 
+  color: #4CAF50;
+}
+
+#accBalance { 
+  background: #161616; 
+  padding: 6px 10px; 
+  border-radius: 8px; 
+  border: 1px solid #333;
+  font-weight: bold;
+  color: #FFD700;
+}
 
 /* Mobil uyum */
 @media (max-width: 700px) {
-  #gameCanvas { width: 95vw; height: auto; }
-  #side { position: static; width: auto; margin: 8px; }
+  #gameCanvas { 
+    width: 95vw; 
+    height: auto; 
+  }
+  
+  #side { 
+    position: static; 
+    width: auto; 
+    margin: 8px;
+    max-width: none;
+  }
+  
+  #topBar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  #authForms {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  #marketContent {
+    width: 95%;
+    padding: 15px;
+  }
+  
+  #marketBtn {
+    bottom: 10px;
+    right: 10px;
+    font-size: 24px;
+    padding: 10px;
+  }
 }
