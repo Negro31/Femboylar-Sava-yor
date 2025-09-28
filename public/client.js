@@ -15,9 +15,15 @@ const itemCatalog = {
   nuke: { key:"nuke", title:"Yok Et!", price:600, desc:"Bütün oyuncuların canını 2 azaltır." }
 };
 
+// Item emojileri - YENİ EKLENDİ
+const itemEmojis = {
+  attack: "⚔️",
+  health: "❤️",
+  shield: "🛡️"
+};
+
 // DOM referanslar
 const joinBtn = document.getElementById("joinBtn");
-const displayNameInput = document.getElementById("displayName");
 const statusDiv = document.getElementById("status");
 const rosterList = document.getElementById("rosterList");
 const leaderboardList = document.getElementById("leaderboardList");
@@ -56,11 +62,10 @@ socket.on("connect", () => {
   }
 });
 
-// Event listeners
+// Event listeners - İSİM GİRME KALDIRILDI
 joinBtn.onclick = () => {
-  const name = (displayNameInput.value || "").trim();
   if (!account) return alert("Önce giriş yapın.");
-  socket.emit("join", name || account.username, (success, msg) => {
+  socket.emit("join", (success, msg) => {
     if (!success) alert(msg || "Katılamadı.");
   });
 };
@@ -85,9 +90,6 @@ btnLogin.onclick = () => {
   socket.emit("login", { username: u, password: p }, (res) => {
     if (res.ok) {
       // login başarılıysa gerçek hesap bilgileri server'dan 'accountUpdate' ile gelecek
-      // fakat UI'ı hemen kullanıcının deneyimini bozmayacak şekilde açalım
-      // (server'dan gelecek accountUpdate içinde sessionToken olacak)
-      // gizlilik: gerçekte sadece server'dan gelecek accountUpdate güvenlidir
       authForms.classList.add("hidden");
       accountInfo.classList.remove("hidden");
     } else {
@@ -102,8 +104,8 @@ logoutBtn.onclick = () => {
     account = null;
     authForms.classList.remove("hidden");
     accountInfo.classList.add("hidden");
-    // sayfayı yenile
-    location.reload();
+    document.getElementById("marketBtn").classList.add("hidden");
+    document.getElementById("side").classList.add("hidden");
   });
 };
 
@@ -162,7 +164,7 @@ socket.on("init", (id) => {
 
 socket.on("updatePlayers", (data) => {
   players = data;
-  renderRoster(); // güncelle
+  renderRoster();
 });
 
 socket.on("updateItems", (data) => {
@@ -226,11 +228,11 @@ function renderAccount() {
   if (!account) return;
   accName.innerText = account.username;
   accBalance.innerText = `${account.balance} ₺`;
-  marketBalanceDiv.innerText = `Bakiye: ${account.balance} ₺`;
+  if (marketBalanceDiv) marketBalanceDiv.innerText = `Bakiye: ${account.balance} ₺`;
 }
 
 function renderMarket() {
-  if (!account) return;
+  if (!account || !marketItemsDiv) return;
   marketItemsDiv.innerHTML = "";
   for (const k of Object.keys(itemCatalog)) {
     const it = itemCatalog[k];
@@ -259,11 +261,12 @@ function renderMarket() {
     div.appendChild(right);
     marketItemsDiv.appendChild(div);
   }
-  marketBalanceDiv.innerText = `Bakiye: ${account.balance} ₺`;
+  if (marketBalanceDiv) marketBalanceDiv.innerText = `Bakiye: ${account.balance} ₺`;
 }
 
 // Roster: onlineUsers ile players birleşimi. Eğer kullanıcı oyuna katılmışsa oyuncu bilgilerini göster
 function renderRoster() {
+  if (!rosterList) return;
   rosterList.innerHTML = "";
   // İlk önce oyuncu olanları listele (oyuna katılmış)
   const joined = Object.values(players).slice().sort((a,b)=> a.name.localeCompare(b.name));
@@ -281,7 +284,7 @@ function renderRoster() {
     dot.style.background = p.color;
     const name = document.createElement("span");
     name.className = "roster-name";
-    name.textContent = `${p.name}${p.account ? " ("+p.account+")": ""}`;
+    name.textContent = p.name; // Sadece hesap adını göster
     left.appendChild(dot);
     left.appendChild(name);
 
@@ -318,6 +321,7 @@ function renderRoster() {
 }
 
 function renderLeaderboard(list) {
+  if (!leaderboardList) return;
   leaderboardList.innerHTML = "";
   for (const entry of list) {
     const li = document.createElement("div");
@@ -338,15 +342,17 @@ function renderLeaderboard(list) {
   }
 }
 
-// Oyun çizimi
+// Oyun çizimi - EMOJİ DESTEĞİ EKLENDİ
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Eşyalar
+  // Eşyalar - EMOJİLER İLE
   for (let item of items) {
-    const size = 15;
-    ctx.fillStyle = item.type === "attack" ? "red" : item.type === "health" || item.type === "heal" ? "green" : "blue";
-    ctx.fillRect(item.x - size/2, item.y - size/2, size, size);
+    const emoji = itemEmojis[item.type] || "?";
+    ctx.font = "24px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(emoji, item.x, item.y);
   }
 
   ctx.font = "12px Arial";
