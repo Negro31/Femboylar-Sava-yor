@@ -67,25 +67,20 @@ let itemLoop = null;
 // username -> socketId (basit tutuyoruz)
 let onlineUsers = {};
 
-// ----------- Kullanıcı veri yönetimi (users.json) -----------
+// ----------- Kullanıcı veri yönetimi (users.json) - DÜZELTME -----------
 function loadUsers() {
   try {
     if (!fs.existsSync(USERS_FILE)) {
       fs.writeFileSync(USERS_FILE, JSON.stringify({}, null, 2), "utf8");
     }
     const raw = fs.readFileSync(USERS_FILE, "utf8");
-    const parsed = JSON.parse(raw || "{}");
-
-    // Eğer dosya eski formatta { "players": {...} } ise normalize et:
-    if (parsed && typeof parsed === "object" && Object.keys(parsed).length === 1 && parsed.players && typeof parsed.players === "object") {
-      return parsed.players;
-    }
-    return parsed;
+    return JSON.parse(raw || "{}");
   } catch (e) {
     console.error("users.json yüklenirken hata:", e);
     return {};
   }
 }
+
 function saveUsers(data) {
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), "utf8");
@@ -367,8 +362,8 @@ io.on("connection", (socket) => {
     cb && cb({ ok: true });
   });
 
-  // Oyuna katılma
-  socket.on("join", (displayName, callback) => {
+  // Oyuna katılma - İSİM GİRME KALDIRILDI
+  socket.on("join", (callback) => {
     const account = socket.data.username || null;
     if (!account) {
       callback && callback(false, "Önce giriş yapmalısın.");
@@ -385,7 +380,7 @@ io.on("connection", (socket) => {
 
     players[socket.id] = {
       id: socket.id,
-      name: displayName || account,
+      name: account, // Sadece hesap adını kullan
       account: account,
       x: Math.random() * (W - 2 * RADIUS) + RADIUS,
       y: Math.random() * (H - 2 * RADIUS) + RADIUS,
