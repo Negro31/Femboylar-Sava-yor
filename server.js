@@ -71,10 +71,13 @@ let onlineUsers = {};
 function loadUsers() {
   try {
     if (!fs.existsSync(USERS_FILE)) {
+      console.log("users.json bulunamadı, yeni dosya oluşturuluyor...");
       fs.writeFileSync(USERS_FILE, JSON.stringify({}, null, 2), "utf8");
     }
     const raw = fs.readFileSync(USERS_FILE, "utf8");
-    return JSON.parse(raw || "{}");
+    const parsed = JSON.parse(raw || "{}");
+    console.log(`${Object.keys(parsed).length} kullanıcı yüklendi`);
+    return parsed;
   } catch (e) {
     console.error("users.json yüklenirken hata:", e);
     return {};
@@ -84,11 +87,17 @@ function loadUsers() {
 function saveUsers(data) {
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), "utf8");
+    console.log("Kullanıcı verileri kaydedildi:", Object.keys(data).length, "kullanıcı");
   } catch (e) {
     console.error("users.json kaydedilemedi:", e);
+    console.error("Dosya yolu:", USERS_FILE);
   }
 }
 let usersData = loadUsers();
+
+// Sunucu başlatıldığında dosya izinlerini kontrol et
+console.log("users.json konumu:", USERS_FILE);
+console.log("Mevcut kullanıcılar:", Object.keys(usersData));
 
 // Basit token üreteci
 function generateToken() {
