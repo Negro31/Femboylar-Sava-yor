@@ -15,7 +15,7 @@ app.use(express.json());
 
 // MongoDB bağlantısı
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
-const DB_NAME = "ballgame";
+const DB_NAME = "Cluster0";
 let db;
 let usersCollection;
 
