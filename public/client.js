@@ -31,12 +31,31 @@ const characterCatalog = {
   }
 };
 
-// Ekipman görselleri (Imgur direkt URL'leri düzeltilecek)
+// Ekipman görselleri (GitHub raw URL'leri)
 const equipmentImages = {
-  sword: "https://i.imgur.com/placeholder.png", // Geçici
-  axe: "https://i.imgur.com/placeholder.png",
-  shield: "https://i.imgur.com/placeholder.png"
+  sword: new Image(),
+  axe: new Image(),
+  shield: new Image()
 };
+
+// Resimleri yükle
+equipmentImages.sword.src = "https://raw.githubusercontent.com/Negro31/Femboylar-Sava-yor/main/public/images/images%20(24).jpeg";
+equipmentImages.axe.src = "https://raw.githubusercontent.com/Negro31/Femboylar-Sava-yor/main/public/images/images%20(1).png";
+equipmentImages.shield.src = "https://raw.githubusercontent.com/Negro31/Femboylar-Sava-yor/main/public/images/images%20(22).jpeg";
+
+let imagesLoaded = 0;
+const totalImages = 3;
+
+equipmentImages.sword.onload = () => checkImagesLoaded();
+equipmentImages.axe.onload = () => checkImagesLoaded();
+equipmentImages.shield.onload = () => checkImagesLoaded();
+
+function checkImagesLoaded() {
+  imagesLoaded++;
+  if (imagesLoaded === totalImages) {
+    console.log("Tüm ekipman resimleri yüklendi");
+  }
+}
 
 // DOM referanslar
 const joinBtn = document.getElementById("joinBtn");
@@ -403,14 +422,14 @@ function renderLeaderboard(list) {
   }
 }
 
-// Oyun çizimi - Ekipmanlı karakterler
+// Oyun çizimi - Resimlerle ve saat gibi düz dönüş
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (let id in players) {
     const p = players[id];
     
-    // Ekipmanları çiz
+    // Ekipmanları çiz - SAAT GİBİ DÜZ DÖNÜŞ
     const angle = p.equipmentAngle || 0;
     const distance = 20 + 15;
     
@@ -421,11 +440,17 @@ function draw() {
       
       ctx.save();
       ctx.translate(swordX, swordY);
-      ctx.rotate(angle);
-      ctx.fillStyle = "#888";
-      ctx.fillRect(-3, -12, 6, 24);
-      ctx.fillStyle = "#FFD700";
-      ctx.fillRect(-5, -15, 10, 3);
+      // Resmi her zaman dik tut (saat gibi)
+      if (equipmentImages.sword.complete) {
+        ctx.drawImage(equipmentImages.sword, -15, -15, 30, 30);
+      } else {
+        // Yedek çizim
+        ctx.rotate(angle);
+        ctx.fillStyle = "#888";
+        ctx.fillRect(-3, -12, 6, 24);
+        ctx.fillStyle = "#FFD700";
+        ctx.fillRect(-5, -15, 10, 3);
+      }
       ctx.restore();
     } else if (p.character === "barbarian") {
       // Balta (yukarı)
@@ -434,19 +459,25 @@ function draw() {
       
       ctx.save();
       ctx.translate(axeX, axeY);
-      ctx.rotate(angle);
-      ctx.fillStyle = "#8B4513";
-      ctx.fillRect(-2, -12, 4, 20);
-      ctx.fillStyle = "#C0C0C0";
-      ctx.beginPath();
-      ctx.moveTo(0, -12);
-      ctx.lineTo(-8, -8);
-      ctx.lineTo(-8, -4);
-      ctx.lineTo(0, -8);
-      ctx.lineTo(8, -4);
-      ctx.lineTo(8, -8);
-      ctx.closePath();
-      ctx.fill();
+      // Resmi her zaman dik tut
+      if (equipmentImages.axe.complete) {
+        ctx.drawImage(equipmentImages.axe, -15, -15, 30, 30);
+      } else {
+        // Yedek çizim
+        ctx.rotate(angle);
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(-2, -12, 4, 20);
+        ctx.fillStyle = "#C0C0C0";
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.lineTo(-8, -8);
+        ctx.lineTo(-8, -4);
+        ctx.lineTo(0, -8);
+        ctx.lineTo(8, -4);
+        ctx.lineTo(8, -8);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
       
       // Kalkan (aşağı)
@@ -457,13 +488,19 @@ function draw() {
         
         ctx.save();
         ctx.translate(shieldX, shieldY);
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
-        ctx.fillStyle = "#4169E1";
-        ctx.fill();
-        ctx.strokeStyle = "#FFD700";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        // Resmi her zaman dik tut
+        if (equipmentImages.shield.complete) {
+          ctx.drawImage(equipmentImages.shield, -15, -15, 30, 30);
+        } else {
+          // Yedek çizim
+          ctx.beginPath();
+          ctx.arc(0, 0, 12, 0, Math.PI * 2);
+          ctx.fillStyle = "#4169E1";
+          ctx.fill();
+          ctx.strokeStyle = "#FFD700";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
         ctx.restore();
       }
     }
