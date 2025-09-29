@@ -72,8 +72,8 @@ let countdownInterval = null;
 let onlineUsers = {};
 
 // Dönen ekipman açısı (her oyuncu için)
-const BASE_ROTATION_SPEED = 0.02; // radyan/tick başlangıç
-const ROTATION_ACCELERATION = 0.0001; // Her tick hız artışı
+const BASE_ROTATION_SPEED = 0.04; // radyan/tick başlangıç (ARTTIRILDI)
+const ROTATION_ACCELERATION = 0.0002; // Her tick hız artışı
 let globalRotationSpeed = BASE_ROTATION_SPEED;
 
 // ----------- Kullanıcı veri yönetimi -----------
@@ -216,11 +216,10 @@ function getEquipmentPositions(player) {
   return positions;
 }
 
-// Ekipman çarpışma kontrolü
+// Ekipman çarpışma kontrolü - GELİŞTİRİLMİŞ SEKİŞ FİZİĞİ
 async function handleEquipmentCollisions() {
   const playerIds = Object.keys(players);
   const deaths = [];
-  const hitCooldowns = {}; // Aynı vuruşun tekrarlanmaması için
 
   for (let i = 0; i < playerIds.length; i++) {
     const pA = players[playerIds[i]];
@@ -239,28 +238,28 @@ async function handleEquipmentCollisions() {
       for (const eqA of equipA) {
         if (eqA.type === "shield") continue; // Kalkan hasar vermez
 
-        const cooldownKey = `${pA.id}-${pB.id}-${Date.now()}`;
-        
         const dist = Math.hypot(eqA.x - pB.x, eqA.y - pB.y);
-        if (dist < RADIUS + 5) {
-          // Cooldown kontrolü (100ms içinde aynı oyuncuya tekrar vuramaz)
-          if (!pA.lastHitTime || Date.now() - pA.lastHitTime > 100) {
+        if (dist < RADIUS + 8) {
+          // Cooldown kontrolü (200ms içinde aynı oyuncuya tekrar vuramaz)
+          if (!pA.lastHitTime || Date.now() - pA.lastHitTime > 200) {
             // Hasar ver
             pB.hp -= eqA.damage;
             pA.lastHitTime = Date.now();
             
-            // Vurulan oyuncuyu geriye ittir
+            // Vurulan oyuncuyu GÜÇLÜ geriye ittir (fiziksel sekme)
             const pushAngle = Math.atan2(pB.y - pA.y, pB.x - pA.x);
-            const pushForce = 3;
-            pB.x += Math.cos(pushAngle) * pushForce;
-            pB.y += Math.sin(pushAngle) * pushForce;
+            const pushForce = 8; // Artırıldı
+            pB.vx = Math.cos(pushAngle) * pushForce;
+            pB.vy = Math.sin(pushAngle) * pushForce;
             
-            // Sınır kontrolü
-            pB.x = Math.max(RADIUS, Math.min(W - RADIUS, pB.x));
-            pB.y = Math.max(RADIUS, Math.min(H - RADIUS, pB.y));
+            // Vuran ekipmanı TERS YÖNDE SEKTİR (180 derece)
+            pA.equipmentAngle += Math.PI;
             
-            // Vuran ekipman geri seksin
-            pA.equipmentAngle += Math.PI / 3; // 60 derece geri sek
+            // Ekipman dönüş hızını da etkilendir
+            pA.rotationSpeedMult = (pA.rotationSpeedMult || 1) * -0.5; // Ters dön
+            setTimeout(() => {
+              if (players[pA.id]) players[pA.id].rotationSpeedMult = 1;
+            }, 300);
             
             if (pB.hp <= 0) {
               deaths.push({ victimId: pB.id, killerUsername: pA.account });
@@ -269,27 +268,41 @@ async function handleEquipmentCollisions() {
         }
       }
 
-      // Ekipman-ekipman çarpışması (geri sekme)
+      // Ekipman-ekipman çarpışması (gerçekçi fiziksel sekme)
       for (const eqA of equipA) {
         for (const eqB of equipB) {
           const dist = Math.hypot(eqA.x - eqB.x, eqA.y - eqB.y);
-          if (dist < 15) {
-            // İki ekipman çarptı
-            if (eqA.type === "shield" && eqB.type !== "shield") {
-              // Kalkan hasar alıyor
-              if (!pA.shieldLastHit || Date.now() - pA.shieldLastHit > 100) {
+          if (dist < 18) {
+            // Cooldown kontrolü
+            const cooldownKey = `${pA.id}-${pB.id}`;
+            if (!pA.equipCollisionTime || Date.now() - pA.equipCollisionTime > 150) {
+              
+              // Kalkan hasar hesabı
+              if (eqA.type === "shield" && eqB.type !== "shield") {
                 pA.shieldHP = Math.max(0, (pA.shieldHP || 0) - eqB.damage);
-                pA.shieldLastHit = Date.now();
-              }
-            } else if (eqB.type === "shield" && eqA.type !== "shield") {
-              if (!pB.shieldLastHit || Date.now() - pB.shieldLastHit > 100) {
+              } else if (eqB.type === "shield" && eqA.type !== "shield") {
                 pB.shieldHP = Math.max(0, (pB.shieldHP || 0) - eqA.damage);
-                pB.shieldLastHit = Date.now();
               }
+              
+              // FİZİKSEL SEKİŞ - her iki ekipman da ters yönde seksin
+              const collisionAngle = Math.atan2(eqB.y - eqA.y, eqB.x - eqA.x);
+              
+              // A'nın ekipmanı geriye seksin
+              pA.equipmentAngle = collisionAngle + Math.PI;
+              
+              // B'nin ekipmanı geriye seksin
+              pB.equipmentAngle = collisionAngle;
+              
+              // Oyuncuları da hafifçe geriye ittir
+              const impactForce = 2;
+              pA.vx -= Math.cos(collisionAngle) * impactForce;
+              pA.vy -= Math.sin(collisionAngle) * impactForce;
+              pB.vx += Math.cos(collisionAngle) * impactForce;
+              pB.vy += Math.sin(collisionAngle) * impactForce;
+              
+              pA.equipCollisionTime = Date.now();
+              pB.equipCollisionTime = Date.now();
             }
-            // Geri sekme efekti
-            pA.equipmentAngle += Math.PI / 6;
-            pB.equipmentAngle -= Math.PI / 6;
           }
         }
       }
