@@ -15,7 +15,7 @@ app.use(express.json());
 
 // MongoDB bağlantısı
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
-const DB_NAME = "Cluster0";
+const DB_NAME = "ballgame";
 let db;
 let usersCollection;
 
@@ -338,6 +338,13 @@ io.on("connection", (socket) => {
     const match = bcrypt.compareSync(password, u.passwordHash || "");
     if (!match) return cb && cb({ ok: false, msg: "Şifre hatalı." });
 
+    // ÖNCEKİ OTURUMU KAPAT (aynı kullanıcı başka yerde açıksa)
+    if (onlineUsers[username]) {
+      const oldSocketId = onlineUsers[username];
+      io.to(oldSocketId).emit("forceLogout", "Hesabınız başka bir yerde açıldı.");
+      io.sockets.sockets.get(oldSocketId)?.disconnect(true);
+    }
+
     const token = generateToken();
     await updateUserFields(username, { sessionToken: token });
 
@@ -365,6 +372,13 @@ io.on("connection", (socket) => {
     const user = allUsers.find(u => u.sessionToken === token);
     
     if (!user) return cb && cb({ ok: false });
+
+    // ÖNCEKİ OTURUMU KAPAT (aynı kullanıcı başka yerde açıksa)
+    if (onlineUsers[user.username]) {
+      const oldSocketId = onlineUsers[user.username];
+      io.to(oldSocketId).emit("forceLogout", "Hesabınız başka bir yerde açıldı.");
+      io.sockets.sockets.get(oldSocketId)?.disconnect(true);
+    }
 
     socket.data.username = user.username;
     onlineUsers[user.username] = socket.id;
