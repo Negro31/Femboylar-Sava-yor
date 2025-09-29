@@ -223,6 +223,18 @@ socket.on("leaderboard", (data) => {
   renderLeaderboard(data);
 });
 
+// Zorla çıkış (başka yerde giriş yapıldıysa)
+socket.on("forceLogout", (message) => {
+  alert(message || "Hesabınız başka bir yerde açıldı.");
+  localStorage.removeItem("sessionToken");
+  account = null;
+  authForms.classList.remove("hidden");
+  accountInfo.classList.add("hidden");
+  document.getElementById("marketBtn").classList.add("hidden");
+  document.getElementById("side").classList.add("hidden");
+  location.reload();
+});
+
 // UI render fonksiyonları
 function renderAccount() {
   if (!account) return;
