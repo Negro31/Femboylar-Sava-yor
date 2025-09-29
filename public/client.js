@@ -1,25 +1,41 @@
-// client.js
+// client.js - Karakter bazlı sistem
 const socket = io();
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 let socketPlayerId = null;
 let players = {};
-let items = [];
-let onlineUsers = []; // oturum açmış kullanıcılar
-let account = null;   // { username, balance, wins, kills, inventory }
+let onlineUsers = [];
+let account = null;
 
-const itemCatalog = {
-  extraLife: { key:"extraLife", title:"Bir şans daha!", price:200, desc:"Kullanıldığında 1 can kazanırsın." },
-  speedBoost: { key:"speedBoost", title:"Kaaçoovvv", price:400, desc:"3 saniyeliğine yüksek hız artışı." },
-  nuke: { key:"nuke", title:"Yok Et!", price:600, desc:"Bütün oyuncuların canını 2 azaltır." }
+// Karakter kataloğu
+const characterCatalog = {
+  warrior: {
+    key: "warrior",
+    name: "Warrior",
+    hp: 300,
+    equipment: "sword",
+    damage: 30,
+    price: 0,
+    desc: "Kılıç ile savaşan temel savaşçı"
+  },
+  barbarian: {
+    key: "barbarian",
+    name: "Barbarian",
+    hp: 210,
+    equipment: "axe_shield",
+    damage: 50,
+    shieldHP: 90,
+    price: 500,
+    desc: "Balta ve kalkan ile savaşan güçlü karakter"
+  }
 };
 
-// Item emojileri - YENİ EKLENDİ
-const itemEmojis = {
-  attack: "⚔️",
-  health: "❤️",
-  shield: "🛡️"
+// Ekipman görselleri (Imgur direkt URL'leri düzeltilecek)
+const equipmentImages = {
+  sword: "https://i.imgur.com/placeholder.png", // Geçici
+  axe: "https://i.imgur.com/placeholder.png",
+  shield: "https://i.imgur.com/placeholder.png"
 };
 
 // DOM referanslar
@@ -28,7 +44,6 @@ const statusDiv = document.getElementById("status");
 const rosterList = document.getElementById("rosterList");
 const leaderboardList = document.getElementById("leaderboardList");
 
-// Auth DOM
 const authUser = document.getElementById("authUser");
 const authPass = document.getElementById("authPass");
 const btnRegister = document.getElementById("btnRegister");
@@ -39,7 +54,6 @@ const accName = document.getElementById("accName");
 const accBalance = document.getElementById("accBalance");
 const logoutBtn = document.getElementById("logoutBtn");
 
-// Market DOM
 const marketBtn = document.getElementById("marketBtn");
 const marketModal = document.getElementById("marketModal");
 const marketContent = document.getElementById("marketContent");
@@ -47,22 +61,22 @@ const marketItemsDiv = document.getElementById("marketItems");
 const marketBalanceDiv = document.getElementById("marketBalance");
 const closeMarketBtn = document.getElementById("closeMarket");
 
-// ------------------ Session resume on connect ------------------
+const characterSelectDiv = document.getElementById("characterSelect");
+const characterListDiv = document.getElementById("characterList");
+
+// Session resume
 socket.on("connect", () => {
-  // Eğer localStorage'da token varsa, sunucuya gönder resume isteği
   const token = localStorage.getItem("sessionToken");
   if (token) {
     socket.emit("resumeSession", token, (res) => {
       if (!res || !res.ok) {
-        // Geçersiz token ise temizle
         localStorage.removeItem("sessionToken");
       }
-      // Eğer resume başarılıysa sunucu 'accountUpdate' gönderecek
     });
   }
 });
 
-// Event listeners - İSİM GİRME KALDIRILDI
+// Event listeners
 joinBtn.onclick = () => {
   if (!account) return alert("Önce giriş yapın.");
   socket.emit("join", (success, msg) => {
@@ -89,7 +103,6 @@ btnLogin.onclick = () => {
   if (!u || !p) return alert("Kullanıcı adı ve şifre girin.");
   socket.emit("login", { username: u, password: p }, (res) => {
     if (res.ok) {
-      // login başarılıysa gerçek hesap bilgileri server'dan 'accountUpdate' ile gelecek
       authForms.classList.add("hidden");
       accountInfo.classList.remove("hidden");
     } else {
@@ -106,6 +119,7 @@ logoutBtn.onclick = () => {
     accountInfo.classList.add("hidden");
     document.getElementById("marketBtn").classList.add("hidden");
     document.getElementById("side").classList.add("hidden");
+    document.getElementById("characterSelect").classList.add("hidden");
   });
 };
 
@@ -125,39 +139,36 @@ function closeMarket() {
   marketModal.classList.add("hidden");
 }
 
-// Arka plana tıklayınca kapat
 marketModal.addEventListener("click", (e) => {
   if (e.target === marketModal) closeMarket();
 });
 
-// ESC ile kapat
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeMarket();
 });
 
-// Satın al
-function buyItem(key) {
-  socket.emit("buyItem", key, (res) => {
+function buyCharacter(key) {
+  socket.emit("buyCharacter", key, (res) => {
     if (res.ok) {
-      alert("Satın alındı!");
+      alert("Karakter satın alındı!");
     } else {
       alert("Satın alma başarısız: " + (res.msg||""));
     }
   });
 }
 
-// Özellik kullan
-function useItem(key) {
-  socket.emit("useItem", key, (res) => {
+function selectCharacter(key) {
+  socket.emit("selectCharacter", key, (res) => {
     if (res.ok) {
-      alert(res.msg || "Kullanıldı.");
+      alert("Karakter seçildi: " + characterCatalog[key].name);
+      renderCharacterSelect();
     } else {
-      alert("Kullanım başarısız: " + (res.msg||""));
+      alert("Seçim başarısız: " + (res.msg||""));
     }
   });
 }
 
-// Socket event handlerları
+// Socket events
 socket.on("init", (id) => {
   socketPlayerId = id;
 });
@@ -165,10 +176,6 @@ socket.on("init", (id) => {
 socket.on("updatePlayers", (data) => {
   players = data;
   renderRoster();
-});
-
-socket.on("updateItems", (data) => {
-  items = data;
 });
 
 socket.on("updateOnlineUsers", (list) => {
@@ -192,38 +199,35 @@ socket.on("winner", (name) => {
   statusDiv.innerText = "Kazanan: " + name;
 });
 
-// Hesap bilgileri (sessionToken sakla / localStorage)
 socket.on("accountUpdate", (acc) => {
   account = {
     username: acc.username,
     balance: acc.balance || 0,
     wins: acc.wins || 0,
     kills: acc.kills || 0,
-    inventory: acc.inventory || {}
+    ownedCharacters: acc.ownedCharacters || ["warrior"],
+    selectedCharacter: acc.selectedCharacter || "warrior"
   };
-  // Eğer sunucu token gönderdi ise localStorage'a kaydet (sayfa yenilense resume edilecek)
   if (acc.sessionToken) {
     localStorage.setItem("sessionToken", acc.sessionToken);
   }
-  // UI güncelle
   renderAccount();
   renderMarket();
+  renderCharacterSelect();
 
-  // account varsa authForms'ı gizle, accountInfo'yu göster, side ve market butonunu aç
   if (account && account.username) {
     authForms.classList.add("hidden");
     accountInfo.classList.remove("hidden");
     document.getElementById("marketBtn").classList.remove("hidden");
     document.getElementById("side").classList.remove("hidden");
+    document.getElementById("characterSelect").classList.remove("hidden");
   }
 });
 
-// Liderlik tablosu
 socket.on("leaderboard", (data) => {
   renderLeaderboard(data);
 });
 
-// Zorla çıkış (başka yerde giriş yapıldıysa)
 socket.on("forceLogout", (message) => {
   alert(message || "Hesabınız başka bir yerde açıldı.");
   localStorage.removeItem("sessionToken");
@@ -232,10 +236,11 @@ socket.on("forceLogout", (message) => {
   accountInfo.classList.add("hidden");
   document.getElementById("marketBtn").classList.add("hidden");
   document.getElementById("side").classList.add("hidden");
+  document.getElementById("characterSelect").classList.add("hidden");
   location.reload();
 });
 
-// UI render fonksiyonları
+// UI render
 function renderAccount() {
   if (!account) return;
   accName.innerText = account.username;
@@ -246,86 +251,126 @@ function renderAccount() {
 function renderMarket() {
   if (!account || !marketItemsDiv) return;
   marketItemsDiv.innerHTML = "";
-  for (const k of Object.keys(itemCatalog)) {
-    const it = itemCatalog[k];
+  
+  for (const k of Object.keys(characterCatalog)) {
+    const char = characterCatalog[k];
+    const owned = account.ownedCharacters.includes(k);
+    
     const div = document.createElement("div");
     div.className = "market-item";
+    
     const left = document.createElement("div");
-    left.innerHTML = `<strong>${it.title}</strong><div style="font-size:12px">${it.price} ₺</div>`;
+    left.innerHTML = `<strong>${char.name}</strong><div style="font-size:12px">HP: ${char.hp} | Hasar: ${char.damage}</div><div style="font-size:11px;color:#aaa">${char.desc}</div>`;
+    
     const right = document.createElement("div");
-    const infoBtn = document.createElement("button");
-    infoBtn.textContent = "i";
-    infoBtn.onclick = () => alert(it.desc);
-    const buyBtn = document.createElement("button");
-    buyBtn.textContent = "Satın Al";
-    buyBtn.onclick = () => buyItem(it.key);
-    right.appendChild(infoBtn);
-    right.appendChild(buyBtn);
-
-    // Eğer hesaptaki inventory varsa "kullan" butonu göster
-    const invCount = account.inventory ? (account.inventory[it.key] || 0) : 0;
-    const useBtn = document.createElement("button");
-    useBtn.textContent = `Kullan (${invCount})`;
-    useBtn.onclick = () => useItem(it.key);
-    right.appendChild(useBtn);
-
+    
+    if (owned) {
+      const ownedLabel = document.createElement("span");
+      ownedLabel.textContent = "✓ Sahip";
+      ownedLabel.style.color = "#4CAF50";
+      ownedLabel.style.fontWeight = "bold";
+      right.appendChild(ownedLabel);
+      
+      const selectBtn = document.createElement("button");
+      selectBtn.textContent = account.selectedCharacter === k ? "Seçili" : "Seç";
+      selectBtn.disabled = account.selectedCharacter === k;
+      selectBtn.onclick = () => selectCharacter(k);
+      right.appendChild(selectBtn);
+    } else {
+      const priceLabel = document.createElement("span");
+      priceLabel.textContent = char.price === 0 ? "Bedava" : `${char.price} ₺`;
+      priceLabel.style.marginRight = "8px";
+      right.appendChild(priceLabel);
+      
+      const buyBtn = document.createElement("button");
+      buyBtn.textContent = "Satın Al";
+      buyBtn.onclick = () => buyCharacter(k);
+      right.appendChild(buyBtn);
+    }
+    
     div.appendChild(left);
     div.appendChild(right);
     marketItemsDiv.appendChild(div);
   }
+  
   if (marketBalanceDiv) marketBalanceDiv.innerText = `Bakiye: ${account.balance} ₺`;
 }
 
-// Roster: onlineUsers ile players birleşimi. Eğer kullanıcı oyuna katılmışsa oyuncu bilgilerini göster
+function renderCharacterSelect() {
+  if (!account || !characterListDiv) return;
+  characterListDiv.innerHTML = "";
+  
+  const selected = account.selectedCharacter || "warrior";
+  const char = characterCatalog[selected];
+  
+  characterListDiv.innerHTML = `
+    <div style="text-align:center">
+      <strong>${char.name}</strong><br>
+      HP: ${char.hp} | Hasar: ${char.damage}
+    </div>
+  `;
+}
+
 function renderRoster() {
   if (!rosterList) return;
   rosterList.innerHTML = "";
-  // İlk önce oyuncu olanları listele (oyuna katılmış)
+  
   const joined = Object.values(players).slice().sort((a,b)=> a.name.localeCompare(b.name));
   const joinedUsernames = new Set(joined.map(p => p.account));
 
-  // Önce joined göster
   for (const p of joined) {
     const li = document.createElement("div");
     li.className = "roster-item";
+    
     const left = document.createElement("div");
     left.style.display = "flex";
     left.style.alignItems = "center";
+    
     const dot = document.createElement("span");
     dot.className = "color-dot";
     dot.style.background = p.color;
+    
     const name = document.createElement("span");
     name.className = "roster-name";
-    name.textContent = p.name; // Sadece hesap adını göster
+    name.textContent = `${p.name} (${characterCatalog[p.character].name})`;
+    
     left.appendChild(dot);
     left.appendChild(name);
 
     const rightText = document.createElement("div");
-    rightText.innerHTML = `<span class="roster-hp">HP: ${p.hp}</span><span class="roster-spike">${p.hasSpike ? "🗡️" : (p.hasShield ? "🛡️" : "—")}</span>`;
+    rightText.innerHTML = `<span class="roster-hp">HP: ${p.hp}</span>`;
+    if (p.character === "barbarian") {
+      rightText.innerHTML += `<span class="roster-spike"> 🛡️${p.shieldHP}</span>`;
+    }
+    
     li.appendChild(left);
     li.appendChild(rightText);
     rosterList.appendChild(li);
   }
 
-  // Sonra oturum açmış ama oyuna katılmamışları göster
   const notJoined = onlineUsers.filter(u => !joinedUsernames.has(u)).sort((a,b)=> a.localeCompare(b));
   for (const username of notJoined) {
     const li = document.createElement("div");
     li.className = "roster-item";
+    
     const left = document.createElement("div");
     left.style.display = "flex";
     left.style.alignItems = "center";
+    
     const dot = document.createElement("span");
     dot.className = "color-dot";
-    dot.style.background = "#888"; // gri
+    dot.style.background = "#888";
+    
     const name = document.createElement("span");
     name.className = "roster-name";
     name.textContent = username + " (hazır)";
+    
     left.appendChild(dot);
     left.appendChild(name);
 
     const rightText = document.createElement("div");
-    rightText.innerHTML = `<span class="roster-hp">—</span><span class="roster-spike">—</span>`;
+    rightText.innerHTML = `<span class="roster-hp">—</span>`;
+    
     li.appendChild(left);
     li.appendChild(rightText);
     rosterList.appendChild(li);
@@ -335,62 +380,109 @@ function renderRoster() {
 function renderLeaderboard(list) {
   if (!leaderboardList) return;
   leaderboardList.innerHTML = "";
+  
   for (const entry of list) {
     const li = document.createElement("div");
     li.className = "roster-item";
+    
     const left = document.createElement("div");
     left.style.display = "flex";
     left.style.alignItems = "center";
+    
     const name = document.createElement("span");
     name.className = "roster-name";
     name.textContent = entry.username;
     left.appendChild(name);
 
     const right = document.createElement("div");
-    right.innerHTML = `Wins: ${entry.wins} • Kills: ${entry.kills} • ${entry.balance}₺`;
+    right.innerHTML = `Wins: ${entry.wins} • Kills: ${entry.kills}`;
+    
     li.appendChild(left);
     li.appendChild(right);
     leaderboardList.appendChild(li);
   }
 }
 
-// Oyun çizimi - EMOJİ DESTEĞİ EKLENDİ
+// Oyun çizimi - Ekipmanlı karakterler
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Eşyalar - EMOJİLER İLE
-  for (let item of items) {
-    const emoji = itemEmojis[item.type] || "?";
-    ctx.font = "24px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(emoji, item.x, item.y);
-  }
-
-  ctx.font = "12px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-
   for (let id in players) {
     const p = players[id];
-    // gövde
+    
+    // Ekipmanları çiz
+    const angle = p.equipmentAngle || 0;
+    const distance = 20 + 15;
+    
+    if (p.character === "warrior") {
+      // Kılıç
+      const swordX = p.x + Math.cos(angle) * distance;
+      const swordY = p.y + Math.sin(angle) * distance;
+      
+      ctx.save();
+      ctx.translate(swordX, swordY);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#888";
+      ctx.fillRect(-3, -12, 6, 24);
+      ctx.fillStyle = "#FFD700";
+      ctx.fillRect(-5, -15, 10, 3);
+      ctx.restore();
+    } else if (p.character === "barbarian") {
+      // Balta (yukarı)
+      const axeX = p.x + Math.cos(angle) * distance;
+      const axeY = p.y + Math.sin(angle) * distance;
+      
+      ctx.save();
+      ctx.translate(axeX, axeY);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#8B4513";
+      ctx.fillRect(-2, -12, 4, 20);
+      ctx.fillStyle = "#C0C0C0";
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(-8, -8);
+      ctx.lineTo(-8, -4);
+      ctx.lineTo(0, -8);
+      ctx.lineTo(8, -4);
+      ctx.lineTo(8, -8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      
+      // Kalkan (aşağı)
+      if (p.shieldHP > 0) {
+        const shieldAngle = angle + Math.PI;
+        const shieldX = p.x + Math.cos(shieldAngle) * distance;
+        const shieldY = p.y + Math.sin(shieldAngle) * distance;
+        
+        ctx.save();
+        ctx.translate(shieldX, shieldY);
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.fillStyle = "#4169E1";
+        ctx.fill();
+        ctx.strokeStyle = "#FFD700";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    
+    // Oyuncu topu
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
     ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    // kalkan varsa beyaz çember
-    if (p.hasShield) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
+    // İsim ve HP
     ctx.fillStyle = "white";
-    const spikeTxt = p.hasSpike ? "🗡️" : "";
-    ctx.fillText(`${p.name} (HP:${p.hp}) ${spikeTxt}`, p.x, p.y - 20);
+    ctx.font = "12px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`${p.name} (HP:${p.hp})`, p.x, p.y - 25);
   }
 
   requestAnimationFrame(draw);
