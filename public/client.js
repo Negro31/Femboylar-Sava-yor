@@ -422,65 +422,102 @@ function renderLeaderboard(list) {
   }
 }
 
-// Oyun çizimi - Resimlerle ve saat gibi düz dönüş
+// Oyun çizimi - SVG stilinde modern ekipmanlar
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (let id in players) {
     const p = players[id];
     
-    // Ekipmanları çiz - SAAT GİBİ DÜZ DÖNÜŞ
+    // Ekipmanları çiz - MODERNİZE EDİLMİŞ GÖRSEL
     const angle = p.equipmentAngle || 0;
-    const distance = 20 + 15;
+    const distance = 20 + 18;
     
     if (p.character === "warrior") {
-      // Kılıç
+      // KILIÇ - Detaylı ve modern
       const swordX = p.x + Math.cos(angle) * distance;
       const swordY = p.y + Math.sin(angle) * distance;
       
       ctx.save();
       ctx.translate(swordX, swordY);
-      // Resmi her zaman dik tut (saat gibi)
-      if (equipmentImages.sword.complete) {
-        ctx.drawImage(equipmentImages.sword, -15, -15, 30, 30);
-      } else {
-        // Yedek çizim
-        ctx.rotate(angle);
-        ctx.fillStyle = "#888";
-        ctx.fillRect(-3, -12, 6, 24);
-        ctx.fillStyle = "#FFD700";
-        ctx.fillRect(-5, -15, 10, 3);
-      }
+      
+      // Gölge efekti
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // Kılıç sapı (kahverengi)
+      ctx.fillStyle = "#8B4513";
+      ctx.fillRect(-4, 8, 8, 12);
+      
+      // Kılıç koruyucusu (altın)
+      ctx.fillStyle = "#FFD700";
+      ctx.fillRect(-10, 6, 20, 3);
+      
+      // Kılıç bıçağı (parlak gri gradyan)
+      const gradient = ctx.createLinearGradient(-5, -15, 5, -15);
+      gradient.addColorStop(0, "#B0B0B0");
+      gradient.addColorStop(0.5, "#FFFFFF");
+      gradient.addColorStop(1, "#B0B0B0");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.lineTo(-5, 6);
+      ctx.lineTo(5, 6);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Bıçak kenar parlaklığı
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
       ctx.restore();
+      
     } else if (p.character === "barbarian") {
-      // Balta (yukarı)
+      // BALTA - Detaylı ve güçlü
       const axeX = p.x + Math.cos(angle) * distance;
       const axeY = p.y + Math.sin(angle) * distance;
       
       ctx.save();
       ctx.translate(axeX, axeY);
-      // Resmi her zaman dik tut
-      if (equipmentImages.axe.complete) {
-        ctx.drawImage(equipmentImages.axe, -15, -15, 30, 30);
-      } else {
-        // Yedek çizim
-        ctx.rotate(angle);
-        ctx.fillStyle = "#8B4513";
-        ctx.fillRect(-2, -12, 4, 20);
-        ctx.fillStyle = "#C0C0C0";
-        ctx.beginPath();
-        ctx.moveTo(0, -12);
-        ctx.lineTo(-8, -8);
-        ctx.lineTo(-8, -4);
-        ctx.lineTo(0, -8);
-        ctx.lineTo(8, -4);
-        ctx.lineTo(8, -8);
-        ctx.closePath();
-        ctx.fill();
-      }
+      
+      // Gölge
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // Balta sapı (koyu kahverengi)
+      ctx.fillStyle = "#654321";
+      ctx.fillRect(-3, -8, 6, 26);
+      
+      // Balta başı (metal gradyan)
+      const axeGradient = ctx.createRadialGradient(0, -12, 0, 0, -12, 12);
+      axeGradient.addColorStop(0, "#E0E0E0");
+      axeGradient.addColorStop(0.5, "#A0A0A0");
+      axeGradient.addColorStop(1, "#606060");
+      ctx.fillStyle = axeGradient;
+      
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.lineTo(-12, -10);
+      ctx.lineTo(-10, -6);
+      ctx.lineTo(0, -8);
+      ctx.lineTo(10, -6);
+      ctx.lineTo(12, -10);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Metal kenar
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      
       ctx.restore();
       
-      // Kalkan (aşağı)
+      // KALKAN - 3D efektli
       if (p.shieldHP > 0) {
         const shieldAngle = angle + Math.PI;
         const shieldX = p.x + Math.cos(shieldAngle) * distance;
@@ -488,40 +525,89 @@ function draw() {
         
         ctx.save();
         ctx.translate(shieldX, shieldY);
-        // Resmi her zaman dik tut
-        if (equipmentImages.shield.complete) {
-          ctx.drawImage(equipmentImages.shield, -15, -15, 30, 30);
-        } else {
-          // Yedek çizim
-          ctx.beginPath();
-          ctx.arc(0, 0, 12, 0, Math.PI * 2);
-          ctx.fillStyle = "#4169E1";
-          ctx.fill();
-          ctx.strokeStyle = "#FFD700";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+        
+        // Gölge
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 5;
+        
+        // Kalkan - gradyan ile 3D efekt
+        const shieldGradient = ctx.createRadialGradient(-3, -3, 2, 0, 0, 16);
+        shieldGradient.addColorStop(0, "#6495ED");
+        shieldGradient.addColorStop(0.5, "#4169E1");
+        shieldGradient.addColorStop(1, "#1E3A8A");
+        
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.fillStyle = shieldGradient;
+        ctx.fill();
+        
+        // Altın çerçeve (kalın)
+        ctx.strokeStyle = "#FFD700";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // İç daire (detay)
+        ctx.beginPath();
+        ctx.arc(0, 0, 8, 0, Math.PI * 2);
+        ctx.strokeStyle = "#FFD700";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Haç deseni
+        ctx.strokeStyle = "#FFD700";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        ctx.lineTo(0, 8);
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(8, 0);
+        ctx.stroke();
+        
         ctx.restore();
       }
     }
     
-    // Oyuncu topu
+    // Oyuncu topu - gradyan ile 3D
+    ctx.save();
+    const playerGradient = ctx.createRadialGradient(p.x - 5, p.y - 5, 2, p.x, p.y, 22);
+    playerGradient.addColorStop(0, lightenColor(p.color, 40));
+    playerGradient.addColorStop(1, p.color);
+    
     ctx.beginPath();
     ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
-    ctx.fillStyle = p.color;
+    ctx.fillStyle = playerGradient;
     ctx.fill();
     ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
+    ctx.restore();
 
     // İsim ve HP
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 3;
     ctx.fillStyle = "white";
-    ctx.font = "12px Arial";
+    ctx.font = "bold 13px Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText(`${p.name} (HP:${p.hp})`, p.x, p.y - 25);
+    ctx.fillText(`${p.name}`, p.x, p.y - 28);
+    ctx.font = "12px Arial";
+    ctx.fillStyle = p.hp > 100 ? "#4CAF50" : p.hp > 50 ? "#FFA500" : "#FF0000";
+    ctx.fillText(`HP: ${p.hp}`, p.x, p.y - 14);
   }
 
   requestAnimationFrame(draw);
 }
+
+// Renk açma fonksiyonu (3D efekt için)
+function lightenColor(color, percent) {
+  const num = parseInt(color.replace("#",""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 +
+    (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
+    .toString(16).slice(1);
+}
+
 draw();
