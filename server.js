@@ -1,4 +1,4 @@
-// server.js - MongoDB ile kalıcı veri saklama
+// server.js - Karakter bazlı savaş sistemi
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -19,7 +19,6 @@ const DB_NAME = "Cluster0";
 let db;
 let usersCollection;
 
-// MongoDB'ye bağlan
 async function connectDB() {
   try {
     const client = new MongoClient(MONGODB_URI);
@@ -27,8 +26,6 @@ async function connectDB() {
     db = client.db(DB_NAME);
     usersCollection = db.collection("users");
     console.log("MongoDB'ye bağlanıldı");
-    
-    // Index oluştur (hızlı arama için)
     await usersCollection.createIndex({ username: 1 }, { unique: true });
   } catch (e) {
     console.error("MongoDB bağlantı hatası:", e);
@@ -39,50 +36,47 @@ async function connectDB() {
 // ---- Oyun ayarları ----
 const W = 600;
 const H = 400;
-const RADIUS = 15;
+const RADIUS = 20; // Oyuncu topu boyutu
 const TICK_MS = 50;
-let BASE_SPEED = 6;
+const BASE_SPEED = 4;
 let SPEED = BASE_SPEED;
-const SPEED_INCREASE = 0.008;
-const ITEM_INTERVAL_MS = 2000;
-const ITEM_LIFETIME_MS = 10000;
+const SPEED_INCREASE = 0.005;
 
-const itemSpawnRates = {
-  attack: 0.6,
-  shield: 0.25,
-  health: 0.15
-};
-
-const itemCatalog = {
-  extraLife: {
-    key: "extraLife",
-    title: "Bir şans daha!",
-    price: 200,
-    desc: "Kullanıldığında 1 can kazanırsın (oyun içinde tüketilir)."
+// Karakter kataloğu
+const characterCatalog = {
+  warrior: {
+    key: "warrior",
+    name: "Warrior",
+    hp: 300,
+    equipment: "sword",
+    damage: 30,
+    price: 0,
+    desc: "Kılıç ile savaşan temel savaşçı"
   },
-  speedBoost: {
-    key: "speedBoost",
-    title: "Kaaçoovvv",
-    price: 400,
-    desc: "3 saniyeliğine yüksek hız artışı sağlar."
-  },
-  nuke: {
-    key: "nuke",
-    title: "Yok Et!",
-    price: 600,
-    desc: "Bütün oyuncuların canını 2 can indirirsin (öldürürse kill sana yazar)."
+  barbarian: {
+    key: "barbarian",
+    name: "Barbarian",
+    hp: 210,
+    equipment: "axe_shield",
+    damage: 50,
+    shieldHP: 90,
+    price: 500,
+    desc: "Balta ve kalkan ile savaşan güçlü karakter"
   }
 };
 
 let players = {};
-let items = [];
 let gameStarted = false;
 let countdown = 10;
 let countdownInterval = null;
-let itemLoop = null;
 let onlineUsers = {};
 
-// ----------- Kullanıcı veri yönetimi (MongoDB) -----------
+// Dönen ekipman açısı (her oyuncu için)
+const BASE_ROTATION_SPEED = 0.02; // radyan/tick başlangıç
+const ROTATION_ACCELERATION = 0.0001; // Her tick hız artışı
+let globalRotationSpeed = BASE_ROTATION_SPEED;
+
+// ----------- Kullanıcı veri yönetimi -----------
 async function getUser(username) {
   if (!usersCollection) return null;
   try {
@@ -95,7 +89,7 @@ async function getUser(username) {
 
 async function saveUser(username, userData) {
   if (!usersCollection) {
-    console.log("MongoDB bağlantısı yok, veri kaydedilemiyor");
+    console.log("MongoDB bağlantısı yok");
     return false;
   }
   try {
@@ -104,7 +98,6 @@ async function saveUser(username, userData) {
       { $set: userData },
       { upsert: true }
     );
-    console.log(`Kullanıcı kaydedildi: ${username}`);
     return true;
   } catch (e) {
     console.error("Kullanıcı kaydetme hatası:", e);
@@ -115,10 +108,7 @@ async function saveUser(username, userData) {
 async function updateUserFields(username, updates) {
   if (!usersCollection) return false;
   try {
-    await usersCollection.updateOne(
-      { username },
-      { $set: updates }
-    );
+    await usersCollection.updateOne({ username }, { $set: updates });
     return true;
   } catch (e) {
     console.error("Kullanıcı güncelleme hatası:", e);
@@ -136,7 +126,6 @@ async function getAllUsers() {
   }
 }
 
-// Basit token üreteci
 function generateToken() {
   return require("crypto").randomBytes(24).toString("hex");
 }
@@ -146,35 +135,6 @@ function normalize(vx, vy, target = SPEED) {
   const mag = Math.hypot(vx, vy) || 1;
   const s = target / mag;
   return { vx: vx * s, vy: vy * s };
-}
-
-function spawnItemOfType(type) {
-  const newItem = {
-    id: Date.now() + Math.random(),
-    type,
-    x: Math.random() * (W - 2 * RADIUS) + RADIUS,
-    y: Math.random() * (H - 2 * RADIUS) + RADIUS,
-  };
-  items.push(newItem);
-  io.emit("updateItems", items);
-
-  setTimeout(() => {
-    items = items.filter((it) => it.id !== newItem.id);
-    io.emit("updateItems", items);
-  }, ITEM_LIFETIME_MS);
-}
-
-function spawnRandomItem() {
-  const r = Math.random();
-  let cum = 0;
-  for (const [type, rate] of Object.entries(itemSpawnRates)) {
-    cum += rate;
-    if (r <= cum) {
-      spawnItemOfType(type);
-      return;
-    }
-  }
-  spawnItemOfType("attack");
 }
 
 async function emitLeaderboard() {
@@ -198,78 +158,119 @@ function emitOnlineUsers() {
 function movePlayers() {
   for (let id in players) {
     const p = players[id];
-    const target = SPEED * (p.speedMult || 1);
     p.x += p.vx;
     p.y += p.vy;
 
+    // Duvar çarpma
     if (p.x < RADIUS) { p.x = RADIUS; p.vx *= -1; }
     else if (p.x > W - RADIUS) { p.x = W - RADIUS; p.vx *= -1; }
     if (p.y < RADIUS) { p.y = RADIUS; p.vy *= -1; }
     else if (p.y > H - RADIUS) { p.y = H - RADIUS; p.vy *= -1; }
 
-    const n = normalize(p.vx, p.vy, target);
+    const n = normalize(p.vx, p.vy, SPEED);
     p.vx = n.vx;
     p.vy = n.vy;
+
+    // Ekipman dönüş açısını güncelle
+    p.equipmentAngle = (p.equipmentAngle || 0) + globalRotationSpeed;
   }
 }
 
-async function handlePlayerCollisions() {
-  const ids = Object.keys(players);
+// Ekipman konumlarını hesapla
+function getEquipmentPositions(player) {
+  const positions = [];
+  const angle = player.equipmentAngle || 0;
+  const distance = RADIUS + 15; // Topun etrafında 15px uzaklıkta
+
+  if (player.character === "warrior") {
+    // Tek kılıç
+    positions.push({
+      type: "sword",
+      x: player.x + Math.cos(angle) * distance,
+      y: player.y + Math.sin(angle) * distance,
+      angle: angle,
+      damage: characterCatalog.warrior.damage
+    });
+  } else if (player.character === "barbarian") {
+    // Balta (12 yön - yukarı)
+    const axeAngle = angle;
+    positions.push({
+      type: "axe",
+      x: player.x + Math.cos(axeAngle) * distance,
+      y: player.y + Math.sin(axeAngle) * distance,
+      angle: axeAngle,
+      damage: characterCatalog.barbarian.damage
+    });
+    
+    // Kalkan (6 yön - aşağı)
+    const shieldAngle = angle + Math.PI;
+    positions.push({
+      type: "shield",
+      x: player.x + Math.cos(shieldAngle) * distance,
+      y: player.y + Math.sin(shieldAngle) * distance,
+      angle: shieldAngle,
+      hp: player.shieldHP || 0
+    });
+  }
+
+  return positions;
+}
+
+// Ekipman çarpışma kontrolü
+async function handleEquipmentCollisions() {
+  const playerIds = Object.keys(players);
   const deaths = [];
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      const a = players[ids[i]];
-      const b = players[ids[j]];
-      if (!a || !b) continue;
 
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const dist = Math.hypot(dx, dy);
+  for (let i = 0; i < playerIds.length; i++) {
+    const pA = players[playerIds[i]];
+    if (!pA) continue;
 
-      if (dist < 2 * RADIUS) {
-        const overlap = 2 * RADIUS - dist || 0.01;
-        const nx = dx / (dist || 1);
-        const ny = dy / (dist || 1);
-        a.x -= (nx * overlap) / 2;
-        a.y -= (ny * overlap) / 2;
-        b.x += (nx * overlap) / 2;
-        b.y += (ny * overlap) / 2;
+    const equipA = getEquipmentPositions(pA);
 
-        const avx = a.vx, avy = a.vy;
-        a.vx = b.vx; a.vy = b.vy;
-        b.vx = avx;  b.vy = avy;
+    for (let j = 0; j < playerIds.length; j++) {
+      if (i === j) continue;
+      const pB = players[playerIds[j]];
+      if (!pB) continue;
 
-        const an = normalize(a.vx, a.vy, SPEED * (a.speedMult || 1));
-        const bn = normalize(b.vx, b.vy, SPEED * (b.speedMult || 1));
-        a.vx = an.vx; a.vy = an.vy;
-        b.vx = bn.vx; b.vy = bn.vy;
+      const equipB = getEquipmentPositions(pB);
 
-        if (a.hasSpike) {
-          if (b.hasShield) {
-            b.hasShield = false;
-          } else {
-            b.hp -= 1;
-            if (b.hp <= 0) {
-              deaths.push({ victimId: b.id, killerUsername: a.account || null });
-            }
+      // A'nın ekipmanı B'nin oyuncusuna çarpıyor mu?
+      for (const eqA of equipA) {
+        if (eqA.type === "shield") continue; // Kalkan hasar vermez
+
+        const dist = Math.hypot(eqA.x - pB.x, eqA.y - pB.y);
+        if (dist < RADIUS + 5) {
+          // Hasar ver
+          pB.hp -= eqA.damage;
+          
+          if (pB.hp <= 0) {
+            deaths.push({ victimId: pB.id, killerUsername: pA.account });
           }
-          a.hasSpike = false;
         }
-        if (b.hasSpike) {
-          if (a.hasShield) {
-            a.hasShield = false;
-          } else {
-            a.hp -= 1;
-            if (a.hp <= 0) {
-              deaths.push({ victimId: a.id, killerUsername: b.account || null });
+      }
+
+      // Ekipman-ekipman çarpışması (geri sekme)
+      for (const eqA of equipA) {
+        for (const eqB of equipB) {
+          const dist = Math.hypot(eqA.x - eqB.x, eqA.y - eqB.y);
+          if (dist < 10) {
+            // İki ekipman çarptı - açıları ters çevir
+            if (eqA.type === "shield" && eqB.type !== "shield") {
+              // Kalkan hasar alıyor
+              pA.shieldHP = Math.max(0, (pA.shieldHP || 0) - eqB.damage);
+            } else if (eqB.type === "shield" && eqA.type !== "shield") {
+              pB.shieldHP = Math.max(0, (pB.shieldHP || 0) - eqA.damage);
             }
+            // Geri sekme efekti (açıları değiştir)
+            pA.equipmentAngle += Math.PI / 4;
+            pB.equipmentAngle -= Math.PI / 4;
           }
-          b.hasSpike = false;
         }
       }
     }
   }
 
+  // Ölümleri işle
   for (const d of deaths) {
     const victim = players[d.victimId];
     if (!victim) continue;
@@ -289,7 +290,7 @@ async function handlePlayerCollisions() {
 
   await emitLeaderboard();
   io.emit("updatePlayers", players);
-  
+
   for (const username of Object.keys(onlineUsers)) {
     const sockId = onlineUsers[username];
     const user = await getUser(username);
@@ -299,7 +300,7 @@ async function handlePlayerCollisions() {
         balance: user.balance || 0,
         wins: user.wins || 0,
         kills: user.kills || 0,
-        inventory: user.inventory || {}
+        ownedCharacters: user.ownedCharacters || ["warrior"]
       });
     }
   }
@@ -324,7 +325,8 @@ io.on("connection", (socket) => {
       balance: 0,
       wins: 0,
       kills: 0,
-      inventory: { extraLife: 0, speedBoost: 0, nuke: 0 }
+      ownedCharacters: ["warrior"], // Başlangıçta sadece warrior
+      selectedCharacter: "warrior"
     });
     
     await emitLeaderboard();
@@ -338,7 +340,6 @@ io.on("connection", (socket) => {
     const match = bcrypt.compareSync(password, u.passwordHash || "");
     if (!match) return cb && cb({ ok: false, msg: "Şifre hatalı." });
 
-    // ÖNCEKİ OTURUMU KAPAT (aynı kullanıcı başka yerde açıksa)
     if (onlineUsers[username]) {
       const oldSocketId = onlineUsers[username];
       io.to(oldSocketId).emit("forceLogout", "Hesabınız başka bir yerde açıldı.");
@@ -357,7 +358,8 @@ io.on("connection", (socket) => {
       balance: u.balance || 0,
       wins: u.wins || 0,
       kills: u.kills || 0,
-      inventory: u.inventory || {},
+      ownedCharacters: u.ownedCharacters || ["warrior"],
+      selectedCharacter: u.selectedCharacter || "warrior",
       sessionToken: token
     });
 
@@ -373,7 +375,6 @@ io.on("connection", (socket) => {
     
     if (!user) return cb && cb({ ok: false });
 
-    // ÖNCEKİ OTURUMU KAPAT (aynı kullanıcı başka yerde açıksa)
     if (onlineUsers[user.username]) {
       const oldSocketId = onlineUsers[user.username];
       io.to(oldSocketId).emit("forceLogout", "Hesabınız başka bir yerde açıldı.");
@@ -389,7 +390,8 @@ io.on("connection", (socket) => {
       balance: user.balance || 0,
       wins: user.wins || 0,
       kills: user.kills || 0,
-      inventory: user.inventory || {},
+      ownedCharacters: user.ownedCharacters || ["warrior"],
+      selectedCharacter: user.selectedCharacter || "warrior",
       sessionToken: user.sessionToken
     });
     
@@ -408,7 +410,32 @@ io.on("connection", (socket) => {
     cb && cb({ ok: true });
   });
 
-  socket.on("join", (callback) => {
+  socket.on("selectCharacter", async (characterKey, cb) => {
+    const username = socket.data.username;
+    if (!username) return cb && cb({ ok: false, msg: "Giriş yapmalısın." });
+
+    const user = await getUser(username);
+    if (!user) return cb && cb({ ok: false, msg: "Kullanıcı bulunamadı." });
+
+    const owned = user.ownedCharacters || ["warrior"];
+    if (!owned.includes(characterKey)) {
+      return cb && cb({ ok: false, msg: "Bu karaktere sahip değilsin." });
+    }
+
+    await updateUserFields(username, { selectedCharacter: characterKey });
+    socket.emit("accountUpdate", {
+      username,
+      balance: user.balance || 0,
+      wins: user.wins || 0,
+      kills: user.kills || 0,
+      ownedCharacters: owned,
+      selectedCharacter: characterKey
+    });
+
+    cb && cb({ ok: true });
+  });
+
+  socket.on("join", async (callback) => {
     const account = socket.data.username || null;
     if (!account) {
       callback && callback(false, "Önce giriş yapmalısın.");
@@ -419,6 +446,15 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const user = await getUser(account);
+    if (!user) {
+      callback && callback(false, "Kullanıcı bulunamadı.");
+      return;
+    }
+
+    const selectedChar = user.selectedCharacter || "warrior";
+    const charData = characterCatalog[selectedChar];
+
     const angle = Math.random() * Math.PI * 2;
     const vx = Math.cos(angle) * SPEED;
     const vy = Math.sin(angle) * SPEED;
@@ -427,15 +463,15 @@ io.on("connection", (socket) => {
       id: socket.id,
       name: account,
       account: account,
+      character: selectedChar,
       x: Math.random() * (W - 2 * RADIUS) + RADIUS,
       y: Math.random() * (H - 2 * RADIUS) + RADIUS,
       vx,
       vy,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6,"0"),
-      hp: 3,
-      hasSpike: false,
-      hasShield: false,
-      speedMult: 1
+      hp: charData.hp,
+      shieldHP: charData.shieldHP || 0,
+      equipmentAngle: Math.random() * Math.PI * 2
     };
 
     socket.emit("init", socket.id);
@@ -446,114 +482,44 @@ io.on("connection", (socket) => {
     checkStartConditions();
   });
 
-  socket.on("buyItem", async (itemKey, cb) => {
+  socket.on("buyCharacter", async (charKey, cb) => {
     const username = socket.data.username;
     if (!username) return cb && cb({ ok: false, msg: "Giriş yapmalısın." });
     
-    const catalogItem = Object.values(itemCatalog).find(i => i.key === itemKey);
-    if (!catalogItem) return cb && cb({ ok: false, msg: "Ürün bulunamadı." });
+    const charData = characterCatalog[charKey];
+    if (!charData) return cb && cb({ ok: false, msg: "Karakter bulunamadı." });
 
     const user = await getUser(username);
-    if (!user || (user.balance || 0) < catalogItem.price) {
+    if (!user) return cb && cb({ ok: false, msg: "Kullanıcı bulunamadı." });
+
+    const owned = user.ownedCharacters || ["warrior"];
+    if (owned.includes(charKey)) {
+      return cb && cb({ ok: false, msg: "Bu karaktere zaten sahipsin." });
+    }
+
+    if ((user.balance || 0) < charData.price) {
       return cb && cb({ ok: false, msg: "Yetersiz bakiye." });
     }
 
-    const newBalance = user.balance - catalogItem.price;
-    const inventory = user.inventory || { extraLife:0, speedBoost:0, nuke:0 };
-    if (itemKey === "extraLife") inventory.extraLife = (inventory.extraLife || 0) + 1;
-    if (itemKey === "speedBoost") inventory.speedBoost = (inventory.speedBoost || 0) + 1;
-    if (itemKey === "nuke") inventory.nuke = (inventory.nuke || 0) + 1;
+    const newBalance = user.balance - charData.price;
+    owned.push(charKey);
 
-    await updateUserFields(username, { balance: newBalance, inventory });
-    
+    await updateUserFields(username, {
+      balance: newBalance,
+      ownedCharacters: owned
+    });
+
     socket.emit("accountUpdate", {
       username,
       balance: newBalance,
       wins: user.wins || 0,
       kills: user.kills || 0,
-      inventory
+      ownedCharacters: owned,
+      selectedCharacter: user.selectedCharacter || "warrior"
     });
-    
+
     await emitLeaderboard();
     cb && cb({ ok: true });
-  });
-
-  socket.on("useItem", async (itemKey, cb) => {
-    const username = socket.data.username;
-    if (!username) return cb && cb({ ok: false, msg: "Giriş yapmalısın." });
-
-    const user = await getUser(username);
-    if (!user) return cb && cb({ ok: false, msg: "Kullanıcı bulunamadı." });
-
-    const inventory = user.inventory || { extraLife:0, speedBoost:0, nuke:0 };
-    const p = players[socket.id];
-    if (!p) return cb && cb({ ok: false, msg: "Oyunda değilsin, özellik kullanımını oyundayken yapabilirsin." });
-
-    if (itemKey === "extraLife") {
-      if ((inventory.extraLife || 0) <= 0) return cb && cb({ ok: false, msg: "Bu üründen yok." });
-      p.hp += 1;
-      inventory.extraLife -= 1;
-      await updateUserFields(username, { inventory });
-      io.emit("updatePlayers", players);
-      socket.emit("accountUpdate", {
-        username, balance: user.balance, wins: user.wins || 0, kills: user.kills || 0, inventory
-      });
-      return cb && cb({ ok: true, msg: "1 can kazandın." });
-    }
-
-    if (itemKey === "speedBoost") {
-      if ((inventory.speedBoost || 0) <= 0) return cb && cb({ ok: false, msg: "Bu üründen yok." });
-      inventory.speedBoost -= 1;
-      p.speedMult = 2;
-      await updateUserFields(username, { inventory });
-      io.emit("updatePlayers", players);
-      socket.emit("accountUpdate", {
-        username, balance: user.balance, wins: user.wins || 0, kills: user.kills || 0, inventory
-      });
-      setTimeout(() => {
-        if (players[socket.id]) {
-          players[socket.id].speedMult = 1;
-          io.emit("updatePlayers", players);
-        }
-      }, 3000);
-      return cb && cb({ ok: true, msg: "3 saniyelik hız verildi." });
-    }
-
-    if (itemKey === "nuke") {
-      if ((inventory.nuke || 0) <= 0) return cb && cb({ ok: false, msg: "Bu üründen yok." });
-      inventory.nuke -= 1;
-      const killed = [];
-      for (const sid of Object.keys(players)) {
-        if (sid === socket.id) continue;
-        const target = players[sid];
-        if (!target) continue;
-        target.hp -= 2;
-        if (target.hp <= 0) {
-          killed.push(sid);
-        }
-      }
-      for (const sid of killed) {
-        delete players[sid];
-      }
-      await updateUserFields(username, {
-        inventory,
-        balance: (user.balance || 0) + (killed.length * 50),
-        kills: (user.kills || 0) + killed.length
-      });
-      io.emit("updatePlayers", players);
-      const updatedUser = await getUser(username);
-      socket.emit("accountUpdate", {
-        username, 
-        balance: updatedUser.balance, 
-        wins: updatedUser.wins || 0, 
-        kills: updatedUser.kills || 0, 
-        inventory
-      });
-      await emitLeaderboard();
-      return cb && cb({ ok: true, msg: `Yok Et! kullanıldı. ${killed.length} oyuncu öldü (varsa).` });
-    }
-
-    cb && cb({ ok: false, msg: "Bilinmeyen ürün." });
   });
 
   socket.on("disconnect", () => {
@@ -568,7 +534,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.emit("updateItems", items);
   socket.emit("updatePlayers", players);
   socket.emit("updateOnlineUsers", Object.keys(onlineUsers));
   emitLeaderboard();
@@ -598,28 +563,15 @@ function checkStartConditions() {
 function startGame() {
   gameStarted = true;
   SPEED = BASE_SPEED;
+  globalRotationSpeed = BASE_ROTATION_SPEED;
   io.emit("gameStart");
 
   const gameLoop = setInterval(() => {
     SPEED += SPEED_INCREASE;
+    globalRotationSpeed += ROTATION_ACCELERATION;
+
     movePlayers();
-
-    for (let id in players) {
-      const p = players[id];
-      for (let i = items.length - 1; i >= 0; i--) {
-        const item = items[i];
-        if (Math.abs(p.x - item.x) < RADIUS + 5 && Math.abs(p.y - item.y) < RADIUS + 5) {
-          if (item.type === "attack") p.hasSpike = true;
-          else if (item.type === "health" || item.type === "heal") p.hp++;
-          else if (item.type === "shield") p.hasShield = true;
-
-          items.splice(i, 1);
-          io.emit("updateItems", items);
-        }
-      }
-    }
-
-    handlePlayerCollisions();
+    handleEquipmentCollisions();
 
     const alive = Object.values(players);
     if (alive.length === 1) {
@@ -643,7 +595,8 @@ function startGame() {
                 balance: updatedUser.balance,
                 wins: updatedUser.wins,
                 kills: updatedUser.kills,
-                inventory: updatedUser.inventory || {}
+                ownedCharacters: updatedUser.ownedCharacters || ["warrior"],
+                selectedCharacter: updatedUser.selectedCharacter || "warrior"
               });
             }
           }
@@ -651,32 +604,24 @@ function startGame() {
       }
 
       clearInterval(gameLoop);
-      clearInterval(itemLoop);
       resetGame();
     } else if (alive.length === 0) {
       clearInterval(gameLoop);
-      clearInterval(itemLoop);
       resetGame();
     }
 
     io.emit("updatePlayers", players);
   }, TICK_MS);
-
-  itemLoop = setInterval(() => {
-    if (gameStarted) spawnRandomItem();
-    else clearInterval(itemLoop);
-  }, ITEM_INTERVAL_MS);
 }
 
 async function resetGame() {
   players = {};
-  items = [];
   gameStarted = false;
   SPEED = BASE_SPEED;
+  globalRotationSpeed = BASE_ROTATION_SPEED;
   countdown = 10;
   countdownInterval = null;
   io.emit("updatePlayers", players);
-  io.emit("updateItems", items);
   await emitLeaderboard();
   
   for (const username of Object.keys(onlineUsers)) {
@@ -688,13 +633,13 @@ async function resetGame() {
         balance: user.balance || 0,
         wins: user.wins || 0,
         kills: user.kills || 0,
-        inventory: user.inventory || {}
+        ownedCharacters: user.ownedCharacters || ["warrior"],
+        selectedCharacter: user.selectedCharacter || "warrior"
       });
     }
   }
 }
 
-// Sunucuyu başlat
 connectDB().then(() => {
   server.listen(3000, () => {
     console.log("Server çalışıyor http://localhost:3000");
