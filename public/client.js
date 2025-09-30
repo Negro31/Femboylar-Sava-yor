@@ -31,31 +31,30 @@ const characterCatalog = {
   }
 };
 
-// Ekipman görselleri (GitHub raw URL'leri)
-const equipmentImages = {
-  sword: new Image(),
-  axe: new Image(),
-  shield: new Image()
+// Ses sistemi
+const sounds = {
+  hit: new Audio("https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3"), // Vuruş sesi
+  clash: new Audio("https://assets.mixkit.co/active_storage/sfx/2566/2566-preview.mp3"), // Metal çarpışma
+  death: new Audio("https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3") // Ölüm
 };
 
-// Resimleri yükle
-equipmentImages.sword.src = "https://raw.githubusercontent.com/Negro31/Femboylar-Sava-yor/main/public/images/images%20(24).jpeg";
-equipmentImages.axe.src = "https://raw.githubusercontent.com/Negro31/Femboylar-Sava-yor/main/public/images/images%20(1).png";
-equipmentImages.shield.src = "https://raw.githubusercontent.com/Negro31/Femboylar-Sava-yor/main/public/images/images%20(22).jpeg";
+// Ses volume ayarı
+sounds.hit.volume = 0.3;
+sounds.clash.volume = 0.4;
+sounds.death.volume = 0.5;
 
-let imagesLoaded = 0;
-const totalImages = 3;
-
-equipmentImages.sword.onload = () => checkImagesLoaded();
-equipmentImages.axe.onload = () => checkImagesLoaded();
-equipmentImages.shield.onload = () => checkImagesLoaded();
-
-function checkImagesLoaded() {
-  imagesLoaded++;
-  if (imagesLoaded === totalImages) {
-    console.log("Tüm ekipman resimleri yüklendi");
+// Ses çalma fonksiyonu
+function playSound(type) {
+  if (sounds[type]) {
+    sounds[type].currentTime = 0;
+    sounds[type].play().catch(e => console.log("Ses çalınamadı:", e));
   }
 }
+
+// Sunucudan ses eventi
+socket.on("playSound", (data) => {
+  playSound(data.type);
+});
 
 // DOM referanslar
 const joinBtn = document.getElementById("joinBtn");
